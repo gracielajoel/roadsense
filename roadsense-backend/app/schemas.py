@@ -63,6 +63,8 @@ class EventCreate(BaseModel):
     confidence: float = Field(ge=0, le=1)
     timestamp_sec: float = Field(ge=0)
     evidence_path: str = ""
+    frame: int | None = Field(default=None, ge=0)
+    bbox: list[float] | None = Field(default=None, min_length=4, max_length=4)
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
 
@@ -84,6 +86,8 @@ class EventOut(BaseModel):
     confidence: float
     timestamp_sec: float
     evidence_url: str | None = None  # diisi di router
+    frame: int | None = None
+    bbox: list[float] | None = None  # [x, y, w, h] relatif 0-1 terhadap frame
     latitude: float | None = None
     longitude: float | None = None
 

@@ -36,9 +36,12 @@ def run_job(job_id: int):
                 damage_type=e.damage_type,
                 confidence=e.confidence,
                 timestamp_sec=e.timestamp_sec,
-                evidence_path=str(Path(e.evidence_image_path).relative_to(STORAGE_DIR))
+                # as_posix: di Windows str(Path) pakai backslash, URL jadi rusak
+                evidence_path=Path(e.evidence_image_path).relative_to(STORAGE_DIR).as_posix()
                 if Path(e.evidence_image_path).is_relative_to(STORAGE_DIR)
                 else e.evidence_image_path,
+                frame=e.frame,
+                bbox=e.bbox,
             ))
         job.status, job.progress = "done", 100
         db.commit()
