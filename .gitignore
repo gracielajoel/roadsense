@@ -24,3 +24,13 @@ build/
 Thumbs.db
 .vscode/
 .idea/
+# Model weights (besar, bagikan lewat Drive)
+*.pt
+*.onnx
+roadsense-backend/storage/weights/
+
+# Data lokal backend (database SQLite & file upload/hasil inference)
+*.db
+roadsense-backend/storage/videos/
+roadsense-backend/storage/evidence/
+roadsense-backend/storage/after/

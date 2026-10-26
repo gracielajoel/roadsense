@@ -4,5 +4,7 @@ sqlalchemy>=2.0
 psycopg2-binary
 python-multipart
 alembic
-# nanti dari tim CV: ultralytics, opencv-python
+ultralytics  # sementara pakai weights teman, lihat app/services/inference.py
+opencv-python
+lap
 python-dotenv

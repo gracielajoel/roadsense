@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import JSON, CheckConstraint, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -55,6 +55,8 @@ class DamageEvent(Base):
     confidence: Mapped[float] = mapped_column(Float)
     timestamp_sec: Mapped[float] = mapped_column(Float)
     evidence_path: Mapped[str] = mapped_column(String(500))
+    frame: Mapped[int | None] = mapped_column(Integer, nullable=True)  # nomor frame di video
+    bbox: Mapped[list[float] | None] = mapped_column(JSON, nullable=True)  # [x, y, w, h] relatif 0-1
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     video: Mapped[Video] = relationship(back_populates="events")
