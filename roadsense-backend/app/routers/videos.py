@@ -36,6 +36,8 @@ def run_job(job_id: int):
                 damage_type=e.damage_type,
                 confidence=e.confidence,
                 timestamp_sec=e.timestamp_sec,
+                frame=e.frame,
+                bbox=e.bbox,
                 evidence_path=str(Path(e.evidence_image_path).relative_to(STORAGE_DIR))
                 if Path(e.evidence_image_path).is_relative_to(STORAGE_DIR)
                 else e.evidence_image_path,

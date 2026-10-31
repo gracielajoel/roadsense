@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Role = Literal["user", "admin"]
 DamageType = Literal["D00", "D10", "D20", "D40"]
@@ -56,6 +56,13 @@ class UserOut(BaseModel):
 
 
 # ---------- Damage Event ----------
+def _check_bbox(v):
+    """bbox = [x, y, lebar, tinggi], tiap nilai 0-1 (relatif terhadap ukuran frame)."""
+    if v is not None and not all(0 <= n <= 1 for n in v):
+        raise ValueError("Semua nilai bbox harus di antara 0 dan 1")
+    return v
+
+
 class EventCreate(BaseModel):
     video_id: int
     track_id: int
@@ -63,8 +70,12 @@ class EventCreate(BaseModel):
     confidence: float = Field(ge=0, le=1)
     timestamp_sec: float = Field(ge=0)
     evidence_path: str = ""
+    frame: int | None = Field(default=None, ge=0)
+    bbox: list[float] | None = Field(default=None, min_length=4, max_length=4)
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
+
+    _bbox_ok = field_validator("bbox")(_check_bbox)
 
 
 class EventUpdate(BaseModel):
@@ -84,6 +95,8 @@ class EventOut(BaseModel):
     confidence: float
     timestamp_sec: float
     evidence_url: str | None = None  # diisi di router
+    frame: int | None = None
+    bbox: list[float] | None = None
     latitude: float | None = None
     longitude: float | None = None
 

@@ -16,6 +16,8 @@ class DetectedEvent:
     confidence: float         # 0-1
     timestamp_sec: float      # detik di video
     evidence_image_path: str  # file screenshot (path absolut/relatif ke storage)
+    frame: int | None = None          # nomor frame evidence di video (0-based)
+    bbox: list[float] | None = None   # [x, y, lebar, tinggi], 0-1 relatif ukuran frame
 
 
 def process_video(
@@ -25,16 +27,16 @@ def process_video(
 ) -> list[DetectedEvent]:
     # --- DUMMY: pura-pura proses, return 3 event palsu ---
     fake = [
-        (1, "D40", 0.91, 3.2),
-        (2, "D00", 0.78, 8.5),
-        (3, "D20", 0.84, 14.0),
+        (1, "D40", 0.91, 3.2, [0.42, 0.55, 0.18, 0.12]),
+        (2, "D00", 0.78, 8.5, [0.30, 0.60, 0.40, 0.08]),
+        (3, "D20", 0.84, 14.0, [0.50, 0.50, 0.25, 0.20]),
     ]
     results = []
-    for i, (tid, dtype, conf, ts) in enumerate(fake, start=1):
+    for i, (tid, dtype, conf, ts, box) in enumerate(fake, start=1):
         time.sleep(1)  # simulasi proses
         img = evidence_dir / f"dummy_{tid}.jpg"
         img.write_bytes(b"")  # placeholder; versi asli: cv2.imwrite(...)
-        results.append(DetectedEvent(tid, dtype, conf, ts, str(img)))
+        results.append(DetectedEvent(tid, dtype, conf, ts, str(img), frame=int(ts * 30), bbox=box))
         if on_progress:
             on_progress(int(i / len(fake) * 100))
     return results
