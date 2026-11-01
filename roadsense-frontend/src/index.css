@@ -1001,3 +1001,19 @@ span.muted.small {
 .link-btn:hover {
   text-decoration: underline;
 }
+
+.complaint-location {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+@media (max-width: 640px) {
+  .complaint-location {
+    grid-template-columns: 1fr 1fr;
+  }
+  .complaint-location .btn {
+    grid-column: 1 / -1;
+  }
+}
