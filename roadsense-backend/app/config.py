@@ -7,6 +7,21 @@ load_dotenv()  # baca file .env di folder tempat uvicorn dijalankan
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./roadsense.db")
 STORAGE_DIR = Path(os.getenv("STORAGE_DIR", "./storage"))
+# --- Model deteksi (dipakai inference.py asli) ---
+MODEL_PATH = Path(os.getenv("MODEL_PATH", "./weights/model.pt"))
+MODEL_IMGSZ = int(os.getenv("MODEL_IMGSZ", "512"))
+MODEL_CONF = float(os.getenv("MODEL_CONF", "0.25"))
+TRACKER_CONFIG = os.getenv("TRACKER_CONFIG", "botsort.yaml")      # atau path ke YAML BoT-SORT kustom
+VID_STRIDE = max(1, int(os.getenv("VID_STRIDE", "1")))           # 1 = proses semua frame; 2 = tiap 2 frame, dst
+MIN_TRACK_FRAMES = max(1, int(os.getenv("MIN_TRACK_FRAMES", "3")))  # track lebih pendek dibuang (anti false detection)
+USE_DUMMY_INFERENCE = os.getenv("USE_DUMMY_INFERENCE", "false").lower() in ("1", "true", "yes")
+
+# --- Login / token ---
+DEFAULT_SECRET_KEY = "dev-only-secret-change-me"
+SECRET_KEY = os.getenv("SECRET_KEY", DEFAULT_SECRET_KEY)
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))  # 8 jam
+MAX_PHOTO_MB = int(os.getenv("MAX_PHOTO_MB", "10"))  # batas ukuran foto after-repair
+
 CORS_ORIGINS = os.getenv(
     "CORS_ORIGINS", "http://localhost:5173,http://localhost:7860"
 ).split(",")

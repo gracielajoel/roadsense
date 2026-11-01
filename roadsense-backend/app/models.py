@@ -18,6 +18,8 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(10), default="user")  # user | admin
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+    # Video yang di-upload user ini
+    videos: Mapped[list["Video"]] = relationship(back_populates="owner")
     # Report yang DIBUAT user ini (1 user -> banyak report)
     reports_created: Mapped[list["Report"]] = relationship(
         back_populates="creator", foreign_keys="Report.user_id"
@@ -33,7 +35,10 @@ class Video(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     filename: Mapped[str] = mapped_column(String(255))
     path: Mapped[str] = mapped_column(String(500))  # relatif terhadap STORAGE_DIR
+    # Pemilik video. NULL hanya untuk video lama sebelum fitur login (hanya admin yang bisa melihat)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    owner: Mapped[User | None] = relationship(back_populates="videos")
     events: Mapped[list["DamageEvent"]] = relationship(back_populates="video")
 
 
@@ -75,6 +80,7 @@ class Report(Base):
     after_photo_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+    event: Mapped[DamageEvent] = relationship()
     creator: Mapped[User] = relationship(
         back_populates="reports_created", foreign_keys=[user_id]
     )

@@ -1,8 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
+from ..config import MAX_PHOTO_MB, STORAGE_DIR
 from ..db import get_db
+from ..deps import get_current_user, require_admin
+from ..serializers import report_out
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -14,112 +19,161 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "Rejected": set(),
     "Completed": set(),
 }
+PHOTO_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 
 
-def _get_or_404(db: Session, report_id: int) -> models.Report:
+def _get_accessible(db: Session, report_id: int, user: models.User) -> models.Report:
+    """Admin boleh semua report; user hanya report miliknya."""
     r = db.get(models.Report, report_id)
     if not r:
         raise HTTPException(404, "Report tidak ditemukan")
+    if user.role != "admin" and r.user_id != user.id:
+        raise HTTPException(403, "Report ini bukan milik kamu")
     return r
 
 
 @router.post("", response_model=schemas.ReportOut, status_code=201)
-def create_report(data: schemas.ReportCreate, db: Session = Depends(get_db)):
-    if not db.get(models.DamageEvent, data.event_id):
+def create_report(
+    data: schemas.ReportCreate,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """User mengirim report dari Damage Event miliknya (status awal: New)."""
+    if user.role != "user":
+        raise HTTPException(403, "Hanya user (bukan admin) yang bisa membuat report")
+    event = db.get(models.DamageEvent, data.event_id)
+    if not event:
         raise HTTPException(404, "Damage event tidak ditemukan")
+    if event.video.user_id != user.id:
+        raise HTTPException(403, "Event ini bukan dari video milik kamu")
     if db.query(models.Report).filter_by(event_id=data.event_id).first():
         raise HTTPException(409, "Event ini sudah pernah dilaporkan")
+    if event.latitude is None or event.longitude is None:
+        raise HTTPException(400, "Lokasi event belum diisi. Tentukan lokasi di peta dulu")
 
-    creator = db.get(models.User, data.user_id)
-    if not creator:
-        raise HTTPException(404, "User tidak ditemukan")
-    # Hapus 2 baris di bawah kalau admin juga boleh membuat report
-    if creator.role != "user":
-        raise HTTPException(403, "Hanya user (bukan admin) yang bisa membuat report")
-
-    r = models.Report(event_id=data.event_id, user_id=data.user_id, status="New")
-    # Catatan pertama di riwayat: report dibuat
+    r = models.Report(event_id=event.id, user_id=user.id, status="New")
     r.status_logs.append(
-        models.ReportStatusLog(from_status=None, to_status="New", changed_by=creator.id)
+        models.ReportStatusLog(from_status=None, to_status="New", changed_by=user.id)
     )
     db.add(r)
     db.commit()
     db.refresh(r)
-    return r
+    return report_out(r)
 
 
 @router.get("", response_model=list[schemas.ReportOut])
 def list_reports(
     status: schemas.ReportStatus | None = None,
     user_id: int | None = None,
+    user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """User: report miliknya. Admin: semua report (filter ?status= dan ?user_id=)."""
     q = db.query(models.Report)
+    if user.role != "admin":
+        q = q.filter_by(user_id=user.id)
+    elif user_id is not None:
+        q = q.filter_by(user_id=user_id)
     if status:
         q = q.filter_by(status=status)
-    if user_id is not None:
-        q = q.filter_by(user_id=user_id)
-    return q.order_by(models.Report.id).all()
+    return [report_out(r) for r in q.order_by(models.Report.id).all()]
 
 
 @router.get("/{report_id}", response_model=schemas.ReportOut)
-def get_report(report_id: int, db: Session = Depends(get_db)):
-    return _get_or_404(db, report_id)
+def get_report(
+    report_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    return report_out(_get_accessible(db, report_id, user))
 
 
 @router.get("/{report_id}/history", response_model=list[schemas.StatusLogOut])
-def get_report_history(report_id: int, db: Session = Depends(get_db)):
+def get_report_history(
+    report_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     """Riwayat status report, urut dari yang paling awal."""
-    r = _get_or_404(db, report_id)
-    return r.status_logs
+    return _get_accessible(db, report_id, user).status_logs
 
 
 @router.patch("/{report_id}", response_model=schemas.ReportOut)
-def update_report(report_id: int, data: schemas.ReportUpdate, db: Session = Depends(get_db)):
-    """Dipakai admin: ganti status (tercatat di riwayat) dan/atau isi foto after-repair."""
-    r = _get_or_404(db, report_id)
-    changes = data.model_dump(exclude_unset=True)
+def update_report(
+    report_id: int,
+    data: schemas.ReportUpdate,
+    admin: models.User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Admin mengganti status. Pelaku perubahan = admin yang login, tercatat di riwayat."""
+    r = db.get(models.Report, report_id)
+    if not r:
+        raise HTTPException(404, "Report tidak ditemukan")
 
-    new_status = changes.get("status")
+    new_status = data.status
     if new_status is not None and new_status != r.status:
-        # 1. siapa yang mengubah: wajib admin
-        if changes.get("changed_by") is None:
-            raise HTTPException(400, "changed_by (id admin) wajib diisi saat mengubah status")
-        admin = db.get(models.User, changes["changed_by"])
-        if not admin:
-            raise HTTPException(404, "Admin tidak ditemukan")
-        if admin.role != "admin":
-            raise HTTPException(403, "changed_by harus user ber-role admin")
-
-        # 2. transisi harus sesuai alur
         allowed = ALLOWED_TRANSITIONS[r.status]
         if new_status not in allowed:
             hint = ", ".join(sorted(allowed)) or "tidak ada (status akhir)"
-            raise HTTPException(409, f"Status {r.status} tidak bisa langsung ke {new_status}. Yang diizinkan: {hint}")
+            raise HTTPException(
+                409, f"Status {r.status} tidak bisa langsung ke {new_status}. Yang diizinkan: {hint}"
+            )
+        if new_status == "Completed" and not r.after_photo_path:
+            raise HTTPException(400, "Unggah foto after-repair dulu sebelum status Completed")
 
-        # 3. catat riwayat; admin pertama yang memproses menjadi verified_by
         r.status_logs.append(
             models.ReportStatusLog(
-                from_status=r.status,
-                to_status=new_status,
-                changed_by=admin.id,
-                note=changes.get("note"),
+                from_status=r.status, to_status=new_status, changed_by=admin.id, note=data.note
             )
         )
-        if r.verified_by is None:
+        if r.verified_by is None:  # admin pertama yang memproses = pemverifikasi
             r.verified_by = admin.id
         r.status = new_status
 
-    if "after_photo_path" in changes:
-        r.after_photo_path = changes["after_photo_path"]
-
     db.commit()
     db.refresh(r)
-    return r
+    return report_out(r)
+
+
+@router.post("/{report_id}/after-photo", response_model=schemas.ReportOut)
+def upload_after_photo(
+    report_id: int,
+    file: UploadFile,
+    _admin: models.User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Admin mengunggah foto setelah perbaikan (jpg/png/webp). Wajib sebelum status Completed."""
+    r = db.get(models.Report, report_id)
+    if not r:
+        raise HTTPException(404, "Report tidak ditemukan")
+    if r.status not in ("In Progress", "Completed"):
+        raise HTTPException(409, "Foto after-repair hanya bisa diunggah saat status In Progress atau Completed")
+    ext = PHOTO_TYPES.get(file.content_type or "")
+    if not ext:
+        raise HTTPException(400, "File harus gambar JPG, PNG, atau WEBP")
+
+    limit = MAX_PHOTO_MB * 1024 * 1024
+    data = file.file.read(limit + 1)
+    if len(data) > limit:
+        raise HTTPException(413, f"Ukuran foto maksimal {MAX_PHOTO_MB} MB")
+    if not data:
+        raise HTTPException(400, "File kosong")
+
+    rel = f"after/report{r.id}_{uuid.uuid4().hex[:8]}{ext}"
+    (STORAGE_DIR / rel).write_bytes(data)
+    if r.after_photo_path:  # ganti foto lama
+        (STORAGE_DIR / r.after_photo_path).unlink(missing_ok=True)
+    r.after_photo_path = rel
+    db.commit()
+    db.refresh(r)
+    return report_out(r)
 
 
 @router.delete("/{report_id}", status_code=204)
-def delete_report(report_id: int, db: Session = Depends(get_db)):
-    r = _get_or_404(db, report_id)
+def delete_report(
+    report_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Admin: hapus report apa pun. User: hanya report miliknya yang masih berstatus New."""
+    r = _get_accessible(db, report_id, user)
+    if user.role != "admin" and r.status != "New":
+        raise HTTPException(403, "Report yang sudah diproses admin tidak bisa dihapus user")
+    if r.after_photo_path:
+        (STORAGE_DIR / r.after_photo_path).unlink(missing_ok=True)
     db.delete(r)  # riwayat status ikut terhapus (cascade)
     db.commit()

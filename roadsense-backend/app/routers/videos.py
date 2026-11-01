@@ -1,3 +1,4 @@
+import re
 import shutil
 import uuid
 from pathlib import Path
@@ -6,6 +7,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFi
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
+from ..deps import ensure_video_access, get_current_user
+from ..serializers import event_out, video_out
 from ..config import STORAGE_DIR
 from ..db import SessionLocal, get_db
 from ..services.inference import process_video
@@ -53,15 +56,29 @@ def run_job(job_id: int):
         db.close()
 
 
+def _get_video_or_404(db: Session, video_id: int) -> models.Video:
+    video = db.get(models.Video, video_id)
+    if not video:
+        raise HTTPException(404, "Video tidak ditemukan")
+    return video
+
+
 @router.post("/videos", response_model=schemas.VideoUploadOut)
-def upload_video(file: UploadFile, bg: BackgroundTasks, db: Session = Depends(get_db)):
+def upload_video(
+    file: UploadFile,
+    bg: BackgroundTasks,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     if not (file.content_type or "").startswith("video/"):
         raise HTTPException(400, "File harus video")
-    rel = f"videos/{uuid.uuid4().hex}_{file.filename}"
+    original = Path(file.filename or "video.mp4").name
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", original)[:100]
+    rel = f"videos/{uuid.uuid4().hex}_{safe}"
     with open(STORAGE_DIR / rel, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    video = models.Video(filename=file.filename, path=rel)
+    video = models.Video(filename=original, path=rel, user_id=user.id)
     db.add(video)
     db.flush()
     job = models.Job(video_id=video.id)
@@ -71,57 +88,73 @@ def upload_video(file: UploadFile, bg: BackgroundTasks, db: Session = Depends(ge
     return {"video_id": video.id, "job_id": job.id}
 
 
-@router.get("/jobs/{job_id}", response_model=schemas.JobOut)
-def get_job(job_id: int, db: Session = Depends(get_db)):
-    job = db.get(models.Job, job_id)
-    if not job:
-        raise HTTPException(404, "Job tidak ditemukan")
-    return job
+@router.get("/videos", response_model=list[schemas.VideoOut])
+def list_videos(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """User: video miliknya. Admin: semua video."""
+    q = db.query(models.Video)
+    if user.role != "admin":
+        q = q.filter_by(user_id=user.id)
+    return [video_out(v) for v in q.order_by(models.Video.id).all()]
+
+
+@router.get("/videos/{video_id}", response_model=schemas.VideoOut)
+def get_video(
+    video_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    video = _get_video_or_404(db, video_id)
+    ensure_video_access(user, video)
+    return video_out(video)
 
 
 @router.get("/videos/{video_id}/events", response_model=list[schemas.EventOut])
-def list_events(video_id: int, db: Session = Depends(get_db)):
+def list_video_events(
+    video_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    video = _get_video_or_404(db, video_id)
+    ensure_video_access(user, video)
     events = (
         db.query(models.DamageEvent)
         .filter_by(video_id=video_id)
         .order_by(models.DamageEvent.timestamp_sec)
         .all()
     )
-    out = []
-    for e in events:
-        item = schemas.EventOut.model_validate(e)
-        item.evidence_url = f"/files/{e.evidence_path}"
-        out.append(item)
-    return out
-
-
-@router.get("/videos", response_model=list[schemas.VideoOut])
-def list_videos(db: Session = Depends(get_db)):
-    return db.query(models.Video).order_by(models.Video.id).all()
-
-
-@router.get("/videos/{video_id}", response_model=schemas.VideoOut)
-def get_video(video_id: int, db: Session = Depends(get_db)):
-    video = db.get(models.Video, video_id)
-    if not video:
-        raise HTTPException(404, "Video tidak ditemukan")
-    return video
+    return [event_out(e) for e in events]
 
 
 @router.get("/jobs", response_model=list[schemas.JobOut])
-def list_jobs(video_id: int | None = None, db: Session = Depends(get_db)):
+def list_jobs(
+    video_id: int | None = None,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     q = db.query(models.Job)
+    if user.role != "admin":
+        q = q.join(models.Video, models.Video.id == models.Job.video_id).filter(
+            models.Video.user_id == user.id
+        )
     if video_id is not None:
-        q = q.filter_by(video_id=video_id)
+        q = q.filter(models.Job.video_id == video_id)
     return q.order_by(models.Job.id).all()
 
 
+@router.get("/jobs/{job_id}", response_model=schemas.JobOut)
+def get_job(
+    job_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    job = db.get(models.Job, job_id)
+    if not job:
+        raise HTTPException(404, "Job tidak ditemukan")
+    ensure_video_access(user, _get_video_or_404(db, job.video_id))
+    return job
+
+
 @router.delete("/videos/{video_id}", status_code=204)
-def delete_video(video_id: int, db: Session = Depends(get_db)):
+def delete_video(
+    video_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     """Hapus video + job + event + file-nya. Ditolak kalau ada event yang sudah jadi report."""
-    video = db.get(models.Video, video_id)
-    if not video:
-        raise HTTPException(404, "Video tidak ditemukan")
+    video = _get_video_or_404(db, video_id)
+    ensure_video_access(user, video)
 
     event_ids = [e.id for e in db.query(models.DamageEvent.id).filter_by(video_id=video_id)]
     if event_ids and db.query(models.Report).filter(models.Report.event_id.in_(event_ids)).first():
