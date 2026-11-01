@@ -1,10 +1,25 @@
-import { ScanEye } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
+import { LogOut, ScanEye } from 'lucide-react'
+import { NavLink, useNavigate } from 'react-router-dom'
+import useAuth from '../auth/useAuth'
+import Button from './ui/Button'
 
-// Sementara belum ada login: profil di kanan masih statis
-const PROFILE = { initials: 'ND', name: 'North District', team: 'Operations team' }
+const initialsOf = (name) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join('')
 
 export default function AppHeader() {
+  const { user, isAdmin, signOut } = useAuth()
+  const navigate = useNavigate()
+
+  const logout = () => {
+    signOut()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <header className="app-header">
       <div className="brand">
@@ -21,15 +36,16 @@ export default function AppHeader() {
         <NavLink to="/" end>
           Citizen app
         </NavLink>
-        <NavLink to="/admin">Admin dashboard</NavLink>
+        {isAdmin && <NavLink to="/admin">Admin dashboard</NavLink>}
       </nav>
 
       <div className="profile">
-        <span className="avatar">{PROFILE.initials}</span>
+        <span className="avatar">{initialsOf(user.name)}</span>
         <div>
-          <strong>{PROFILE.name}</strong>
-          <span>{PROFILE.team}</span>
+          <strong>{user.name}</strong>
+          <span>{isAdmin ? 'Administrator' : 'Citizen'}</span>
         </div>
+        <Button variant="ghost" icon={LogOut} onClick={logout} aria-label="Log out" title="Log out" />
       </div>
     </header>
   )

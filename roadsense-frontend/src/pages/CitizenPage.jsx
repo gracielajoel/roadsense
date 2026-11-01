@@ -1,5 +1,6 @@
 import { FileText, Gauge, ScanLine, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { updateEvent } from '../api/events'
 import { createReport, listReports } from '../api/reports'
 import { getJob, listVideoEvents, listVideos, uploadVideo } from '../api/videos'
 import ComplaintForm from '../components/inspection/ComplaintForm'
@@ -10,7 +11,7 @@ import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import StatCard from '../components/ui/StatCard'
-import { DEMO_USER_ID, fileUrl } from '../config'
+import { fileUrl } from '../config'
 import { formatPercent } from '../utils/format'
 import { averageConfidence, confidenceLabel, roadConditionLabel, roadConditionScore } from '../utils/inspection'
 
@@ -107,7 +108,10 @@ export default function CitizenPage() {
   }
 
   const submitComplaint = async (form) => {
-    const report = await createReport({ event_id: selectedId, user_id: DEMO_USER_ID, ...form })
+    // Backend menolak report kalau event belum punya lokasi, jadi simpan lokasi dulu
+    const { latitude, longitude, ...rest } = form
+    await updateEvent(selectedId, { latitude: Number(latitude), longitude: Number(longitude) })
+    const report = await createReport({ event_id: selectedId, ...rest })
     setReports((r) => ({ ...r, [selectedId]: report.id }))
   }
 

@@ -1,4 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom'
+import { RequireAdmin, RequireAuth } from './auth/guards'
 import AdminLayout from './layouts/AdminLayout'
 import MainLayout from './layouts/MainLayout'
 import EventsPage from './pages/admin/EventsPage'
@@ -9,28 +10,40 @@ import UsersPage from './pages/admin/UsersPage'
 import VideoDetailPage from './pages/admin/VideoDetailPage'
 import VideosPage from './pages/admin/VideosPage'
 import CitizenPage from './pages/CitizenPage'
+import LoginPage from './pages/LoginPage'
 import NotFoundPage from './pages/NotFoundPage'
 
 const router = createBrowserRouter([
+  { path: '/login', element: <LoginPage /> },
   {
     path: '/',
-    element: <MainLayout />,
+    element: <RequireAuth />,
     children: [
-      { index: true, element: <CitizenPage /> },
       {
-        path: 'admin',
-        element: <AdminLayout />,
+        element: <MainLayout />,
         children: [
-          { index: true, element: <OverviewPage /> },
-          { path: 'reports', element: <ReportsPage /> },
-          { path: 'reports/:id', element: <ReportDetailPage /> },
-          { path: 'events', element: <EventsPage /> },
-          { path: 'videos', element: <VideosPage /> },
-          { path: 'videos/:id', element: <VideoDetailPage /> },
-          { path: 'users', element: <UsersPage /> },
+          { index: true, element: <CitizenPage /> },
+          {
+            path: 'admin',
+            element: <RequireAdmin />,
+            children: [
+              {
+                element: <AdminLayout />,
+                children: [
+                  { index: true, element: <OverviewPage /> },
+                  { path: 'reports', element: <ReportsPage /> },
+                  { path: 'reports/:id', element: <ReportDetailPage /> },
+                  { path: 'events', element: <EventsPage /> },
+                  { path: 'videos', element: <VideosPage /> },
+                  { path: 'videos/:id', element: <VideoDetailPage /> },
+                  { path: 'users', element: <UsersPage /> },
+                ],
+              },
+            ],
+          },
+          { path: '*', element: <NotFoundPage /> },
         ],
       },
-      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ])

@@ -1,19 +1,41 @@
-import { ArrowRight, Check, CircleCheck } from 'lucide-react'
+import { ArrowRight, Check, CircleCheck, MapPin } from 'lucide-react'
 import { useState } from 'react'
 import { damageLabel, formatPercent, formatTime } from '../../utils/format'
 import Button from '../ui/Button'
 import Field from '../ui/Field'
 import FrameThumb from './FrameThumb'
 
-const EMPTY = { road_name: '', landmark: '', description: '' }
+const EMPTY = { road_name: '', landmark: '', description: '', latitude: '', longitude: '' }
 
 // reportId terisi kalau event ini sudah pernah dilaporkan
 export default function ComplaintForm({ event, videoSrc, reportId, onSubmit }) {
-  const [form, setForm] = useState(EMPTY)
+  const [form, setForm] = useState(() => ({
+    ...EMPTY,
+    latitude: event?.latitude ?? '',
+    longitude: event?.longitude ?? '',
+  }))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  const [locating, setLocating] = useState(false)
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
+
+  const useMyLocation = () => {
+    if (!navigator.geolocation) return setError('Browser does not support location')
+    setLocating(true)
+    setError(null)
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setForm((f) => ({ ...f, latitude: coords.latitude.toFixed(6), longitude: coords.longitude.toFixed(6) }))
+        setLocating(false)
+      },
+      () => {
+        setError('Could not get your location. Allow location access or type the coordinates.')
+        setLocating(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -55,6 +77,33 @@ export default function ComplaintForm({ event, videoSrc, reportId, onSubmit }) {
       <form className="complaint-form" onSubmit={handleSubmit}>
         <Field label="Road name" placeholder="e.g. Elm Street" value={form.road_name} onChange={set('road_name')} required />
         <Field label="Nearest landmark" placeholder="e.g. outside No. 24" value={form.landmark} onChange={set('landmark')} />
+        <div className="complaint-location">
+          <Field
+            label="Latitude"
+            type="number"
+            step="any"
+            min="-90"
+            max="90"
+            placeholder="-6.200000"
+            value={form.latitude}
+            onChange={set('latitude')}
+            required
+          />
+          <Field
+            label="Longitude"
+            type="number"
+            step="any"
+            min="-180"
+            max="180"
+            placeholder="106.816666"
+            value={form.longitude}
+            onChange={set('longitude')}
+            required
+          />
+          <Button variant="secondary" icon={MapPin} onClick={useMyLocation} disabled={locating}>
+            {locating ? 'Locating…' : 'Use my location'}
+          </Button>
+        </div>
         <Field
           label="Additional description"
           multiline

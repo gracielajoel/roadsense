@@ -8,9 +8,6 @@ export const API_URL = `${API_BASE_URL}/api/v1`
 // true = sebagian fungsi di src/api memakai data demo dari src/mocks (tanpa backend)
 export const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
-// Sementara belum ada login
-export const DEMO_USER_ID = Number(import.meta.env.VITE_DEMO_USER_ID || 1)
-
 // Backend mengembalikan path file relatif (mis. evidence_url "/files/evidence/x.jpg"
 // atau after_photo_path "after/x.jpg"). Ubah jadi URL lengkap untuk <img>/<video>.
 export function fileUrl(path) {
