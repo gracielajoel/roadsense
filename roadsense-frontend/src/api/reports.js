@@ -14,3 +14,10 @@ export const createReport = (data) =>
 // data: { status, note }. Admin yang login tercatat otomatis; foto after-repair lewat POST /reports/{id}/after-photo
 export const updateReport = (id, data) => client.patch(`/reports/${id}`, data).then((r) => r.data)
 export const deleteReport = (id) => client.delete(`/reports/${id}`)
+
+// Foto after-repair (jpg/png/webp). Hanya saat status In Progress atau Completed.
+export const uploadAfterPhoto = (id, file) => {
+  const form = new FormData()
+  form.append('file', file)
+  return client.post(`/reports/${id}/after-photo`, form).then((r) => r.data)
+}
