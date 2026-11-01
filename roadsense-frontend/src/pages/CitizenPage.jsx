@@ -10,7 +10,7 @@ import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import StatCard from '../components/ui/StatCard'
-import { DEMO_USER_ID, fileUrl } from '../config'
+import { fileUrl } from '../config'
 import { formatPercent } from '../utils/format'
 import { averageConfidence, confidenceLabel, roadConditionLabel, roadConditionScore } from '../utils/inspection'
 
@@ -107,7 +107,7 @@ export default function CitizenPage() {
   }
 
   const submitComplaint = async (form) => {
-    const report = await createReport({ event_id: selectedId, user_id: DEMO_USER_ID, ...form })
+    const report = await createReport({ event_id: selectedId, ...form })
     setReports((r) => ({ ...r, [selectedId]: report.id }))
   }
 
