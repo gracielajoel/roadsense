@@ -105,16 +105,55 @@ Aturan singkat:
 | Path                 | Akses  | Halaman                                           | Endpoint utama |
 | -------------------- | ------ | ------------------------------------------------- | -------------- |
 | `/login`             | publik | Login & register                                  | `POST /auth/login`, `POST /auth/register`, `GET /auth/me` |
-| `/`                  | login  | Citizen app (upload, deteksi, komplain)           | `GET/POST /videos`, `GET /jobs/{id}`, `GET /videos/{id}/events`, `PATCH /events/{id}`, `GET/POST /reports` |
+| `/live`              | login  | **Live scan** dari HP: kamera + GPS, HUD, ringkasan & report 1 tap | `POST /live/sessions`, `POST /live/sessions/{id}/frames`, `POST /live/sessions/{id}/end`, `POST /reports` |
+| `/reports`           | login  | Laporan saya + status perbaikan (before/after)    | `GET /reports`, `GET /stats` |
+| `/`                  | login  | Upload video (deteksi, komplain)                  | `GET/POST /videos`, `GET /jobs/{id}`, `GET /videos/{id}/events`, `PATCH /events/{id}`, `GET/POST /reports` |
 | `/admin`             | admin  | Overview: statistik dan laporan terbaru           | `GET /stats`, `GET /reports` |
+| `/admin/triage`      | admin  | Antrean report `New` + panel inspeksi, cek duplikat (radius 20 m), approve/reject | `GET /reports`, `PATCH /reports/{id}` |
+| `/admin/work-orders` | admin  | Kanban perbaikan per status report                | `GET /reports`, `PATCH /reports/{id}` |
 | `/admin/reports`     | admin  | Daftar laporan, filter status                     | `GET /reports?status=` |
 | `/admin/reports/:id` | admin  | Detail laporan, ubah status, foto after-repair, riwayat | `GET /reports/{id}`, `GET /reports/{id}/history`, `PATCH /reports/{id}`, `POST /reports/{id}/after-photo` |
 | `/admin/events`      | admin  | Semua deteksi, koreksi tipe kerusakan             | `GET /events`, `PATCH /events/{id}` |
-| `/admin/videos`      | admin  | Daftar video, status analisis, hapus              | `GET /videos`, `GET /jobs`, `DELETE /videos/{id}` |
+| `/admin/videos`      | admin  | Daftar sesi live & video upload, status, hapus    | `GET /videos`, `GET /jobs`, `DELETE /videos/{id}` |
 | `/admin/videos/:id`  | admin  | Player dengan bounding box dan daftar deteksi     | `GET /videos/{id}`, `GET /videos/{id}/events` |
 | `/admin/users`       | admin  | Kelola user                                       | `GET/POST /users`, `PATCH/DELETE /users/{id}` |
 
 Dokumentasi lengkap endpoint: http://localhost:8000/docs (Swagger dari FastAPI).
+
+## Live Scan dari HP
+
+Alur: HP di balik kaca depan → kamera belakang → tiap 1 detik (atau 2 detik) frame dikecilkan ke 640px JPEG (±25 KB) → dikirim ke backend → backend menjalankan model dan membalas kotak deteksi → HUD menampilkan kotak + toast "POTHOLE LOGGED". **Tidak ada inference di HP.**
+
+- Frame berikutnya baru dikirim setelah balasan frame sebelumnya datang, jadi kalau sinyal lemah frame dilewati (tidak menumpuk). Kalau koneksi putus, HUD menampilkan "Reconnecting" dan mencoba lagi dengan jeda makin panjang.
+- Layar dijaga tetap menyala (Wake Lock API). Tombol **DIM** menggelapkan layar (hemat baterai di layar OLED) sementara scan tetap jalan.
+- Jarak tempuh dihitung dari GPS (titik dengan akurasi > 30 m diabaikan). Kecepatan dari `coords.speed` GPS.
+- Portrait: layout seperti Figma 04. Landscape (HP di dudukan dashboard): kamera penuh layar, HUD melayang di atasnya.
+- Bisa di-"install" ke home screen (`public/manifest.webmanifest`), terbuka langsung di `/live` tanpa address bar.
+
+### Mencoba di HP
+
+Kamera di browser HP **wajib HTTPS**. Cara paling gampang: tunnel HTTPS ke dev server.
+
+1. Di `.env` frontend, kosongkan URL backend supaya request lewat proxy Vite (`/api`, `/files` → `localhost:8000`):
+   ```
+   VITE_API_BASE_URL=
+   ```
+2. Jalankan backend (`uvicorn app.main:app`) dan `npm run dev` seperti biasa.
+3. Buka tunnel, misalnya [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) (gratis, tanpa akun):
+   ```bash
+   cloudflared tunnel --url http://localhost:5173
+   ```
+4. Buka URL `https://....trycloudflare.com` yang muncul di HP, login, lalu tab **Live HUD**.
+
+Domain `*.trycloudflare.com` dan `*.ngrok-free.app` sudah diizinkan di `vite.config.js` (`allowedHosts`). Proxy Vite bisa diarahkan ke backend lain dengan env `ROADSENSE_BACKEND=http://host:port`.
+
+Tanpa backend: `VITE_USE_MOCK=true` juga mendukung live scan (deteksi palsu dari `src/mocks/live.js`).
+
+## Tampilan (Figma)
+
+Warna, font, dan komponen mengikuti file Figma "MANPRO DETEKSI JALAN": token warna di `:root` (`src/index.css`), komponen layar baru di `src/telemetry.css`. Font: Inter + JetBrains Mono. Tingkat keparahan (`SEVERITY` di `utils/constants.js`): lubang (`D40`) = SEV-1 merah, retak = SEV-2 kuning; warna bounding box mengikuti ini.
+
+Bagian Figma yang **sengaja tidak dibuat** karena datanya tidak ada di sistem: RTK/LiDAR/IRI/OBD, kru & SLA, poin/leaderboard, voice tag, peta GIS interaktif.
 
 ## Alur Halaman Citizen
 
@@ -125,7 +164,8 @@ Dokumentasi lengkap endpoint: http://localhost:8000/docs (Swagger dari FastAPI).
 
 ## Belum Ada
 
-- Peta persebaran kerusakan (detail laporan hanya memberi link ke OpenStreetMap).
+- Peta persebaran kerusakan (detail laporan hanya memberi link ke OpenStreetMap). Endpoint `GET /stats/map` sudah ada di backend.
+- Sesi live yang tidak diakhiri (HP mati / tab ditutup paksa) tetap berstatus `processing`; belum ada penutupan otomatis.
 - `road_name`, `landmark`, `description` di form komplain dikirim FE tapi diabaikan backend (`ReportCreate` hanya menerima `event_id`).
 - Skor "Road condition" masih dihitung di FE (`utils/inspection.js`), belum dari backend.
 - Foto evidence: kalau gambar gagal dimuat, thumbnail otomatis diambil dari frame video.

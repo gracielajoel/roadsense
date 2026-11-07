@@ -1,4 +1,4 @@
-import { LogOut, ScanEye } from 'lucide-react'
+import { LogOut, Radio } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import useAuth from '../auth/useAuth'
 import Button from './ui/Button'
@@ -24,19 +24,21 @@ export default function AppHeader() {
     <header className="app-header">
       <div className="brand">
         <span className="brand-mark">
-          <ScanEye size={17} />
+          <Radio size={17} />
         </span>
         <div>
-          <strong>RoadSense</strong>
-          <span>AI damage detection</span>
+          <strong>ROADSENSE</strong>
+          <span>{isAdmin ? 'GIS command' : 'Road telemetry'}</span>
         </div>
       </div>
 
       <nav className="segmented">
         <NavLink to="/" end>
-          Citizen app
+          Upload
         </NavLink>
-        {isAdmin && <NavLink to="/admin">Admin dashboard</NavLink>}
+        <NavLink to="/live">Live scan</NavLink>
+        <NavLink to="/reports">My reports</NavLink>
+        {isAdmin && <NavLink to="/admin">Admin</NavLink>}
       </nav>
 
       <div className="profile">

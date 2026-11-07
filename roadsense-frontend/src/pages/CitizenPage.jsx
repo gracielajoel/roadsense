@@ -37,7 +37,7 @@ export default function CitizenPage() {
     const run = runRef.current
     ;(async () => {
       const videos = await listVideos()
-      const latest = videos.at(-1)
+      const latest = videos.filter((v) => !v.is_live).at(-1) // sesi live scan tidak punya file video
       if (!latest) return
       const [evts, reportList] = await Promise.all([listVideoEvents(latest.id), listReports()])
       if (run !== runRef.current) return // user sudah upload video lain

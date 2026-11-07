@@ -1,6 +1,8 @@
 // Semua konfigurasi yang bergantung environment dibaca dari sini.
 // Nilai diambil dari file .env (lihat .env.example).
-export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, '')
+// Kosong ("VITE_API_BASE_URL=") = same origin: request lewat proxy Vite (/api, /files),
+// dipakai saat membuka app dari HP lewat HTTPS tunnel (lihat README).
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/+$/, '')
 
 // Semua endpoint REST backend ada di bawah /api/v1
 export const API_URL = `${API_BASE_URL}/api/v1`

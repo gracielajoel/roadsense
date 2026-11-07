@@ -58,6 +58,7 @@ export default function VideoPlayer({ src, filename, events, videoRef, phase, pr
         {active && (
           <BoundingBox
             bbox={active.bbox}
+            type={active.damage_type}
             label={`${damageLabel(active.damage_type)} · ${formatPercent(active.confidence)}`}
           />
         )}
