@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from . import models  # noqa: F401  (daftarkan tabel)
 from .config import CORS_ORIGINS, DEFAULT_SECRET_KEY, SECRET_KEY, STORAGE_DIR
 from .db import Base, engine
-from .routers import auth, events, reports, stats, users, videos
+from .routers import auth, events, live, reports, stats, users, videos
 
 # Prototype: buat tabel otomatis. Nanti ganti ke Alembic.
 Base.metadata.create_all(bind=engine)
@@ -26,7 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (auth.router, videos.router, users.router, events.router, reports.router, stats.router):
+for r in (auth.router, videos.router, live.router, users.router, events.router, reports.router, stats.router):
     app.include_router(r, prefix="/api/v1")
 
 # Evidence, video, after-photo diakses via /files/<path>

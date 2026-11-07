@@ -58,7 +58,8 @@ class VideoOut(BaseModel):
     id: int
     filename: str
     path: str
-    url: str | None = None  # diisi di router: /files/<path>
+    url: str | None = None  # diisi di router: /files/<path>; None untuk sesi live
+    is_live: bool = False   # True = sesi live scan dari HP (tidak ada file video)
     user_id: int | None = None
     created_at: datetime
 

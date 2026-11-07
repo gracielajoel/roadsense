@@ -16,7 +16,7 @@ export default function FrameThumb({ event, videoSrc, showTime = true }) {
       ) : (
         videoSrc && <video src={`${videoSrc}#t=${event.timestamp_sec}`} preload="metadata" muted playsInline />
       )}
-      <BoundingBox bbox={event.bbox} />
+      <BoundingBox bbox={event.bbox} type={event.damage_type} />
       {showTime && <span className="thumb-time">{formatTime(event.timestamp_sec)}</span>}
     </div>
   )
