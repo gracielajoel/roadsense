@@ -51,22 +51,27 @@ _model_lock = threading.Lock()
 _infer_lock = threading.Lock()  # tracker menyimpan state -> satu video diproses satu per satu
 
 
+def load_model():
+    """Muat model YOLO baru dari MODEL_PATH (dipakai juga oleh live.py untuk instance terpisah)."""
+    if not MODEL_PATH.is_file():
+        raise FileNotFoundError(
+            f"Model tidak ditemukan di {MODEL_PATH}. Taruh file .pt di folder weights/ "
+            "dan atur MODEL_PATH di .env"
+        )
+    try:
+        from ultralytics import YOLO
+    except ImportError as exc:
+        raise RuntimeError("Library ultralytics belum terpasang (pip install ultralytics)") from exc
+    model = YOLO(str(MODEL_PATH))
+    validate_model_classes(model.names)  # pastikan 4 kelas D00/D10/D20/D40
+    return model
+
+
 def _get_model():
     global _model
     with _model_lock:
         if _model is None:
-            if not MODEL_PATH.is_file():
-                raise FileNotFoundError(
-                    f"Model tidak ditemukan di {MODEL_PATH}. Taruh file .pt di folder weights/ "
-                    "dan atur MODEL_PATH di .env"
-                )
-            try:
-                from ultralytics import YOLO
-            except ImportError as exc:
-                raise RuntimeError("Library ultralytics belum terpasang (pip install ultralytics)") from exc
-            model = YOLO(str(MODEL_PATH))
-            validate_model_classes(model.names)  # pastikan 4 kelas D00/D10/D20/D40
-            _model = model
+            _model = load_model()
         return _model
 
 

@@ -4,7 +4,8 @@ from . import models, schemas
 
 def video_out(v: models.Video) -> schemas.VideoOut:
     out = schemas.VideoOut.model_validate(v)
-    out.url = f"/files/{v.path}"
+    out.is_live = v.path.startswith("live/")
+    out.url = None if out.is_live else f"/files/{v.path}"
     return out
 
 

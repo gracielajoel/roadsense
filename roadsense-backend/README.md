@@ -102,6 +102,24 @@ python diagnose_video.py path\ke\video.mp4          # setelan sama persis dengan
 python diagnose_video.py path\ke\video.mp4 0.10     # coba confidence lebih rendah
 ```
 
+## Live Scan dari HP
+
+HP ditaruh di balik kaca depan mobil dan mengirim **frame kamera** (JPEG ±25 KB, 1 per detik) ke server. Model jalan di server, bukan di HP, supaya HP tidak panas dan baterai awet.
+
+| Endpoint | Fungsi |
+| --- | --- |
+| `POST /api/v1/live/sessions` | Mulai sesi → `{ video_id, job_id }` |
+| `POST /api/v1/live/sessions/{video_id}/frames` | Multipart: `file` (JPEG), `t` (detik sejak mulai), `seq`, `lat`, `lng` → deteksi frame itu |
+| `POST /api/v1/live/sessions/{video_id}/end` | Akhiri sesi (job jadi `done`) |
+
+- Satu sesi live disimpan sebagai **satu baris `videos`** (`path` = `live/<uuid>`, tanpa file video) + satu `jobs` berstatus `processing` selama sesi jalan. Jadi event, report, statistik, dan halaman admin yang lama tetap jalan **tanpa migrasi tabel**. `VideoOut.is_live` = `true` untuk sesi ini.
+- Event langsung terisi `latitude`/`longitude` dari GPS HP, jadi bisa langsung dijadikan report.
+- **Deduplikasi:** kerusakan yang sama terlihat di beberapa frame. Deteksi sejenis digabung ke event lama kalau terakhir terlihat ≤ `LIVE_MERGE_SEC` detik lalu atau berjarak ≤ `LIVE_MERGE_METERS`. Evidence yang disimpan = frame dengan confidence tertinggi.
+- Model live memakai **instance YOLO terpisah** dari pemrosesan video upload, jadi video panjang yang sedang diproses tidak membuat live scan menunggu.
+- Inference per frame ±25 ms (GPU/CPU kuat). `USE_DUMMY_INFERENCE=true` juga berlaku untuk live scan: kerusakan palsu muncul 2-4 frame berturut-turut, jadi deduplikasi ikut teruji.
+
+Setelan di `.env`: `LIVE_CONF` (default 0.35), `LIVE_MERGE_METERS` (15), `LIVE_MERGE_SEC` (4), `MAX_FRAME_KB` (1500).
+
 ## Troubleshooting
 
 | Gejala | Penyebab & solusi |
