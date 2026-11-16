@@ -1,24 +1,28 @@
+/* Token dari Figma "03 Assets & Design System" (Tactical Telemetry & GIS) */
 :root {
-  --bg: #111317;
-  --surface: #1a1d23;
-  --card: linear-gradient(180deg, #262a32 0%, #1f2229 100%);
-  --raised: #2a2e37;
-  --input: #14161b;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.16);
-  --text: #eceef2;
-  --muted: #8b919c;
-  --faint: #5d636d;
-  --accent: #66758b;
-  --accent-strong: #7d8ca3;
-  --danger: #ff5c5c;
-  --warning: #e8a55c;
-  --success: #5fd39d;
+  --bg: #0a0e13; /* surface-container-lowest */
+  --surface: #101419;
+  --card: #181c21; /* surface-container-low */
+  --raised: #22272e;
+  --input: #0d1116;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --text: #e6e9ed;
+  --muted: #8a9199;
+  --faint: #5b626b;
+  --accent: #00f59b; /* primary-container */
+  --accent-strong: #00f59b;
+  --on-accent: #00311d;
+  --danger: #ff3b30; /* error-container */
+  --danger-deep: #93000a;
+  --warning: #feb700; /* secondary-container */
+  --success: #00f59b;
   --info: #7aa7ff;
-  --radius: 14px;
+  --radius: 8px;
+  --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
 
   color-scheme: dark;
-  font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   color: var(--text);
@@ -45,7 +49,7 @@ a {
 }
 
 code {
-  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-family: var(--mono);
   font-size: 0.85em;
   padding: 2px 6px;
   border-radius: 6px;
@@ -99,7 +103,7 @@ span.muted.small {
 
 .app {
   min-height: 100vh;
-  background: radial-gradient(1200px 500px at 50% -200px, #1f232b 0%, var(--bg) 70%);
+  background: var(--bg);
 }
 
 .container {
@@ -121,7 +125,7 @@ span.muted.small {
   gap: 16px;
   padding: 12px 24px;
   border-bottom: 1px solid var(--border);
-  background: rgba(17, 19, 23, 0.8);
+  background: rgba(10, 14, 19, 0.85);
   backdrop-filter: blur(10px);
   position: sticky;
   top: 0;
@@ -165,6 +169,7 @@ span.muted.small {
 
 .brand-mark,
 .avatar {
+  font-family: var(--mono);
   display: grid;
   place-items: center;
   width: 30px;
@@ -233,6 +238,7 @@ span.muted.small {
   text-transform: uppercase;
   color: var(--muted);
   margin-bottom: 6px;
+  font-family: var(--mono);
 }
 
 .btn {
@@ -256,10 +262,10 @@ span.muted.small {
 }
 
 .btn-primary {
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: linear-gradient(180deg, var(--accent-strong), var(--accent));
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  color: var(--on-accent);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  box-shadow: 0 0 18px rgba(0, 245, 155, 0.18);
 }
 
 .btn-primary:not(:disabled):hover {
@@ -387,6 +393,7 @@ span.muted.small {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--faint);
+  font-family: var(--mono);
 }
 
 .stat-value {
@@ -417,6 +424,7 @@ span.muted.small {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--faint);
+  font-family: var(--mono);
 }
 
 .field input,
@@ -1051,6 +1059,7 @@ span.muted.small {
   color: var(--faint);
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
+  font-family: var(--mono);
 }
 
 .table td {

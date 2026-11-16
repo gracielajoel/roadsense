@@ -6,11 +6,15 @@ import EventsPage from './pages/admin/EventsPage'
 import OverviewPage from './pages/admin/OverviewPage'
 import ReportDetailPage from './pages/admin/ReportDetailPage'
 import ReportsPage from './pages/admin/ReportsPage'
+import TriagePage from './pages/admin/TriagePage'
 import UsersPage from './pages/admin/UsersPage'
 import VideoDetailPage from './pages/admin/VideoDetailPage'
 import VideosPage from './pages/admin/VideosPage'
+import WorkOrdersPage from './pages/admin/WorkOrdersPage'
 import CitizenPage from './pages/CitizenPage'
+import LiveScanPage from './pages/LiveScanPage'
 import LoginPage from './pages/LoginPage'
+import MyReportsPage from './pages/MyReportsPage'
 import NotFoundPage from './pages/NotFoundPage'
 
 const router = createBrowserRouter([
@@ -23,6 +27,8 @@ const router = createBrowserRouter([
         element: <MainLayout />,
         children: [
           { index: true, element: <CitizenPage /> },
+          { path: 'live', element: <LiveScanPage /> },
+          { path: 'reports', element: <MyReportsPage /> },
           {
             path: 'admin',
             element: <RequireAdmin />,
@@ -31,6 +37,8 @@ const router = createBrowserRouter([
                 element: <AdminLayout />,
                 children: [
                   { index: true, element: <OverviewPage /> },
+                  { path: 'triage', element: <TriagePage /> },
+                  { path: 'work-orders', element: <WorkOrdersPage /> },
                   { path: 'reports', element: <ReportsPage /> },
                   { path: 'reports/:id', element: <ReportDetailPage /> },
                   { path: 'events', element: <EventsPage /> },

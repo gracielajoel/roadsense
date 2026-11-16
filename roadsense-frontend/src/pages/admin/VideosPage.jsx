@@ -38,7 +38,7 @@ export default function VideosPage() {
   const rows = [...(videos.data || [])].reverse()
 
   return (
-    <Card eyebrow="Admin dashboard" title="Videos" description="Uploaded inspection footage and how the analysis went.">
+    <Card eyebrow="Admin dashboard" title="Scans & videos" description="Live phone scans and uploaded footage, and how the analysis went.">
       {actionError && (
         <p className="tone-danger small" role="alert">
           {actionError}
@@ -47,7 +47,7 @@ export default function VideosPage() {
       <DataState loading={videos.loading} error={videos.error} onRetry={videos.reload}>
         {rows.length === 0 ? (
           <div className="empty">
-            <p>No videos uploaded yet.</p>
+            <p>No scans or videos yet.</p>
           </div>
         ) : (
           <div className="table-wrap">
@@ -55,6 +55,7 @@ export default function VideosPage() {
               <thead>
                 <tr>
                   <th>ID</th>
+                  <th>Source</th>
                   <th>File</th>
                   <th>Uploaded by</th>
                   <th>Uploaded</th>
@@ -69,13 +70,16 @@ export default function VideosPage() {
                   return (
                     <tr key={v.id}>
                       <td>#{v.id}</td>
+                      <td>
+                        <Badge tone={v.is_live ? 'success' : 'neutral'}>{v.is_live ? 'Live scan' : 'Upload'}</Badge>
+                      </td>
                       <td className="cell-file">{v.filename}</td>
                       <td>{nameOf(v.user_id)}</td>
                       <td className="small">{formatDateTime(v.created_at)}</td>
                       <td>
                         {job ? (
                           <Badge tone={JOB_TONE[job.status]}>
-                            {job.status === 'processing' ? `processing ${job.progress}%` : job.status}
+                            {job.status === 'processing' ? (v.is_live ? 'scanning' : `processing ${job.progress}%`) : job.status}
                           </Badge>
                         ) : (
                           '—'
