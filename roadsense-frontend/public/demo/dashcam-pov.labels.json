@@ -1,0 +1,17 @@
+{
+  "about": "Ground-truth damage in dashcam-pov.mp4, marked by hand frame by frame. Only used when the backend runs dummy inference (USE_DUMMY_INFERENCE=true): instead of random boxes, the dummy returns these, so the simulated warning lines up with the real pothole in the video. The real model ignores this. Times are seconds in the clip; keys are [t, x, y, w, h] with x/y = top-left, all 0-1.",
+  "tracks": [
+    { "type": "D00", "confidence": [0.52, 0.61], "keys": [[5.9, 0.43, 0.585, 0.08, 0.19], [6.6, 0.43, 0.62, 0.08, 0.19]] },
+    { "type": "D00", "confidence": [0.55, 0.63], "keys": [[7.7, 0.595, 0.62, 0.07, 0.16], [8.3, 0.6, 0.66, 0.07, 0.16]] },
+    {
+      "type": "D40",
+      "confidence": [0.58, 0.93],
+      "keys": [
+        [14.85, 0.515, 0.535, 0.045, 0.03],
+        [15.15, 0.53, 0.578, 0.048, 0.032],
+        [15.38, 0.543, 0.625, 0.085, 0.058],
+        [15.55, 0.565, 0.69, 0.115, 0.1]
+      ]
+    }
+  ]
+}

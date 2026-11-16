@@ -9,6 +9,7 @@ bbox = [x, y, lebar, tinggi], 0-1, x/y = pojok kiri-atas (sama seperti inference
 """
 from __future__ import annotations
 
+import json
 import math
 import random
 import threading
@@ -101,8 +102,34 @@ def _detect_dummy(_jpeg: bytes) -> list[FrameDetection]:
         return [det]
 
 
-def detect_frame(jpeg: bytes) -> list[FrameDetection]:
+def _parse_sim_labels(raw: str) -> list[FrameDetection]:
+    """Label dari mode simulasi (kerusakan asli di video demo, ditandai manual).
+
+    Hanya dipakai dummy inference supaya peringatan muncul tepat saat lubang di video terlihat,
+    bukan acak. Format: [{"damage_type": "D40", "confidence": 0.8, "bbox": [x, y, w, h]}, ...]
+    """
+    try:
+        items = json.loads(raw)
+    except ValueError:
+        return []
+    out = []
+    for it in items[:10] if isinstance(items, list) else []:
+        try:
+            if it["damage_type"] not in ("D00", "D10", "D20", "D40"):
+                continue
+            x, y, w, h = (min(max(float(v), 0.0), 1.0) for v in it["bbox"])
+            conf = min(max(float(it.get("confidence", 0.6)), 0.0), 1.0)
+        except (KeyError, TypeError, ValueError):
+            continue
+        out.append(FrameDetection(it["damage_type"], round(conf, 4), [round(x, 4), round(y, 4), round(w, 4), round(h, 4)]))
+    return out
+
+
+def detect_frame(jpeg: bytes, sim_labels: str | None = None) -> list[FrameDetection]:
+    """sim_labels: dikirim HP saat simulasi dengan video demo berlabel. Model asli mengabaikannya."""
     if USE_DUMMY_INFERENCE:
+        if sim_labels is not None:
+            return _parse_sim_labels(sim_labels)
         return _detect_dummy(jpeg)
     return _detect_real(jpeg)
 
