@@ -1,7 +1,6 @@
 import {
   ArrowLeft,
   BatteryCharging,
-  CircleCheck,
   CloudUpload,
   Film,
   Gauge,
@@ -27,11 +26,8 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { endLiveSession, listLiveEvents, sendLiveFrame, startLiveSession } from '../api/live'
-import { createReport } from '../api/reports'
-import useAuth from '../auth/useAuth'
 import BoundingBox from '../components/inspection/BoundingBox'
-import FrameThumb from '../components/inspection/FrameThumb'
-import Badge from '../components/ui/Badge'
+import DriveDetections from '../components/DriveDetections'
 import Button from '../components/ui/Button'
 import { createAlerter } from '../utils/alerts'
 import { severityOf } from '../utils/constants'
@@ -52,7 +48,7 @@ const WARNING_MS = 2200 // lama banner peringatan lubang tampil
 
 // Mode simulasi: video dashcam POV diputar sebagai pengganti kamera HP (untuk demo & uji
 // tanpa menyetir). Frame tetap dikirim ke server lewat jalur yang sama persis.
-const DEMO_DASHCAM = { url: '/demo/dashcam-pov.mp4', name: 'Demo dashcam POV (36 s)' }
+const DEMO_DASHCAM = { url: '/demo/dashcam-pov.mp4', name: 'Demo dashcam POV (23 s)' }
 const SIM_START = { lat: -7.2797, lng: 112.7974 } // titik awal GPS simulasi (Surabaya)
 const SIM_SPEED = 11 // m/s ≈ 40 km/jam
 const SIM_HEADING = (35 * Math.PI) / 180
@@ -77,7 +73,6 @@ function cameraError(err) {
 }
 
 export default function LiveScanPage() {
-  const { isAdmin } = useAuth()
   const [phase, setPhase] = useState('setup') // setup | starting | running | ending | summary
   const [intervalMs, setIntervalMs] = useState(INTERVALS[0].ms)
   const [error, setError] = useState(null)
@@ -95,6 +90,7 @@ export default function LiveScanPage() {
   const [simVideo, setSimVideo] = useState(DEMO_DASHCAM) // { url, name }
   const [soundOn, setSoundOn] = useState(true)
   const [warning, setWarning] = useState(null) // { at } saat lubang terdeteksi
+  const [warnCount, setWarnCount] = useState(0) // jumlah peringatan lubang di perjalanan ini
 
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -273,6 +269,7 @@ export default function LiveScanPage() {
     setElapsed(0)
     setDimmed(false)
     setPaused(false)
+    setWarnCount(0)
     pausedRef.current = false
     startedAtRef.current = Date.now()
     runningRef.current = true
@@ -326,6 +323,7 @@ export default function LiveScanPage() {
             setBoxes({ list: res.detections, at: Date.now() })
             if (res.detections.some((d) => severityOf(d.damage_type).level === 1) && alerterRef.current?.pothole()) {
               setWarning({ at: Date.now() })
+              setWarnCount((n) => n + 1)
             }
             const fresh = res.detections.find((d) => d.is_new)
             if (fresh) setToast({ type: fresh.damage_type, confidence: fresh.confidence, lat: g?.lat, lng: g?.lng, at: Date.now() })
@@ -525,16 +523,16 @@ export default function LiveScanPage() {
     )
   }
 
-  if (phase === 'summary') return <LiveSummary videoId={session?.video_id} canReport={!isAdmin} onAgain={reset} />
+  if (phase === 'summary') return <LiveSummary videoId={session?.video_id} potholeWarnings={warnCount} onAgain={reset} />
 
   return (
     <div className="page live-setup">
       <section className="hero">
         <div>
           <p className="eyebrow">Live scan</p>
-          <h1>Scan the road while you drive.</h1>
+          <h1>Get warned about potholes while you drive.</h1>
           <p className="hero-sub">
-            Your phone only takes pictures. Detection runs in the cloud, so the phone stays cool and the battery lasts.
+            Your phone only takes pictures. Detection runs in the cloud and warns you with a sound when a pothole is ahead, so the phone stays cool and the battery lasts.
           </p>
         </div>
       </section>
@@ -555,7 +553,7 @@ export default function LiveScanPage() {
           </span>
           <div>
             <strong>Allow camera and location</strong>
-            <p className="muted small">Location is attached to every detection so it can be reported straight away.</p>
+            <p className="muted small">Location is saved with every detection, so you can look back at your drives later.</p>
           </div>
         </li>
         <li>
@@ -626,98 +624,40 @@ export default function LiveScanPage() {
   )
 }
 
-function LiveSummary({ videoId, canReport, onAgain }) {
+function LiveSummary({ videoId, potholeWarnings, onAgain }) {
   const [events, setEvents] = useState(videoId ? null : [])
   const [error, setError] = useState(null)
-  const [reported, setReported] = useState({}) // event_id -> report id | 'sending' | Error
-  const [selected, setSelected] = useState(null)
 
   useEffect(() => {
     if (!videoId) return
     listLiveEvents(videoId)
-      .then((evts) => {
-        setEvents(evts)
-        setSelected(evts[0] ?? null)
-      })
+      .then(setEvents)
       .catch((err) => setError(err.message))
   }, [videoId])
 
-  const report = async (e) => {
-    setReported((r) => ({ ...r, [e.id]: 'sending' }))
-    try {
-      const rep = await createReport({ event_id: e.id })
-      setReported((r) => ({ ...r, [e.id]: rep.id }))
-    } catch (err) {
-      setReported((r) => ({ ...r, [e.id]: err }))
-    }
-  }
+  const potholes = (events || []).filter((e) => severityOf(e.damage_type).level === 1).length
 
   return (
     <div className="page">
       <section className="hero">
         <div>
-          <p className="eyebrow">Live scan finished</p>
-          <h1>{events ? `${events.length} damage ${events.length === 1 ? 'spot' : 'spots'} found.` : 'Loading results…'}</h1>
-          <p className="hero-sub">Each spot already has its GPS location. Send the ones that look right as reports.</p>
+          <p className="eyebrow">Drive finished</p>
+          <h1>{events ? `${events.length} damage ${events.length === 1 ? 'spot' : 'spots'} on this drive.` : 'Loading results…'}</h1>
+          <p className="hero-sub">
+            {events && `${potholes} ${potholes === 1 ? 'pothole' : 'potholes'}, ${potholeWarnings} ${potholeWarnings === 1 ? 'warning' : 'warnings'} given. `}
+            Saved to your history with the location of each spot.
+          </p>
         </div>
         <Button icon={Video} onClick={onAgain}>
-          New scan
+          New drive
         </Button>
       </section>
 
       {error && <p className="tone-danger small">{error}</p>}
+      {events && <DriveDetections events={events} />}
 
-      {selected && (
-        <div className="card live-preview">
-          <FrameThumb event={selected} showTime={false} />
-        </div>
-      )}
-
-      {events?.length === 0 && (
-        <div className="empty">
-          <CircleCheck size={22} />
-          <p>No road damage was detected on this drive.</p>
-        </div>
-      )}
-
-      <ul className="detections">
-        {events?.map((e) => {
-          const st = reported[e.id]
-          const hasGps = e.latitude != null && e.longitude != null
-          const sev = severityOf(e.damage_type)
-          return (
-            <li key={e.id} className={`detection live-result ${selected?.id === e.id ? 'is-selected' : ''}`}>
-              <button type="button" className="live-result-main" onClick={() => setSelected(e)}>
-                <FrameThumb event={e} />
-                <span className="detection-info">
-                  <strong>
-                    {damageLabel(e.damage_type)} <Badge tone={sev.tone}>{sev.label}</Badge>
-                  </strong>
-                  <span className="muted small mono">
-                    CONF {formatPercent(e.confidence)} · {hasGps ? `${e.latitude.toFixed(5)}, ${e.longitude.toFixed(5)}` : 'NO GPS'}
-                  </span>
-                </span>
-              </button>
-              {canReport &&
-                (typeof st === 'number' ? (
-                  <Badge tone="success">Report #{st}</Badge>
-                ) : (
-                  <Button
-                    variant="secondary"
-                    onClick={() => report(e)}
-                    disabled={!hasGps || st === 'sending'}
-                    title={st instanceof Error ? st.message : hasGps ? 'Send as report' : 'No GPS fix for this spot'}
-                  >
-                    {st === 'sending' ? 'Sending…' : st instanceof Error ? 'Retry' : 'Report'}
-                  </Button>
-                ))}
-            </li>
-          )
-        })}
-      </ul>
-
-      <Link className="table-link back-link" to="/reports">
-        <ArrowLeft size={14} /> My reports
+      <Link className="table-link back-link" to="/history">
+        <ArrowLeft size={14} /> Drive history
       </Link>
     </div>
   )

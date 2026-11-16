@@ -5,8 +5,8 @@ import { USE_MOCK } from '../config'
 import { AuthContext } from './context'
 import { clearToken, getToken, setToken } from './token'
 
-// Mode mock tidak punya backend, jadi tidak ada login: langsung dianggap admin.
-const MOCK_USER = { id: 0, name: 'Demo Admin', email: 'demo@roadsense.local', role: 'admin' }
+// Mode mock tidak punya backend, jadi tidak ada login: langsung dianggap pengendara demo.
+const MOCK_USER = { id: 0, name: 'Demo Driver', email: 'demo@roadsense.local', role: 'user' }
 
 export default function AuthProvider({ children }) {
   const [user, setUser] = useState(USE_MOCK ? MOCK_USER : null)

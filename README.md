@@ -1,6 +1,8 @@
 # RoadSense
 
-Sistem deteksi kerusakan jalan dari video. Video jalan di-upload, model computer vision mendeteksi kerusakan (retak & lubang), lalu hasil deteksi bisa dijadikan laporan yang diverifikasi dan ditindaklanjuti admin.
+Aplikasi peringatan lubang untuk pengendara. HP ditaruh di balik kaca depan dan mengirim frame kamera ke server, model computer vision mendeteksi kerusakan jalan (retak & lubang), lalu HP memberi peringatan suara kalau ada lubang di depan. Fokus hanya untuk pengendara: tidak ada pelaporan ke pemerintah dan tidak ada dashboard admin.
+
+**Video demo (58 detik, ada suara):** [`docs/demo/roadsense-driver-demo.mp4`](docs/demo/roadsense-driver-demo.mp4), simulasi dashcam POV, peringatan lubang, ringkasan perjalanan, dan History (inference dummy).
 
 ## Stack
 
@@ -70,10 +72,9 @@ Buka `.env`, ganti `SECRET_KEY` dengan string acak:
 python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-Buat akun admin (hanya sekali), lalu jalankan server:
+Jalankan server:
 
 ```bash
-python -m app.seed admin@test.com rahasia123 "Admin"
 uvicorn app.main:app --reload
 ```
 
@@ -94,8 +95,7 @@ Buka http://localhost:5173.
 
 ### 5. Login
 
-- **Admin**: email dan password yang tadi dibuat dengan `app.seed`. Masuk ke dashboard admin.
-- **Warga**: klik **Register** di halaman login, lalu masuk dan upload video.
+Klik **Register** di halaman login, buat akun pengendara, lalu masuk. Halaman pertama adalah **Live HUD**. Untuk mencoba tanpa menyetir, pilih **Dashcam simulation**.
 
 ## Menjalankan Lagi (hari berikutnya)
 
@@ -122,12 +122,12 @@ Data tersimpan di volume Docker, jadi tidak hilang selama volume tidak dihapus. 
 
 - Frontend memanggil backend di `VITE_API_BASE_URL` (default `http://localhost:8000`), semua endpoint di bawah `/api/v1`.
 - Setiap request membawa token login (`Authorization: Bearer ...`). Tanpa token, backend membalas 401 "Not authenticated".
-- File (video, foto evidence, foto after-repair) disajikan backend di `/files/...`.
+- File (foto evidence deteksi) disajikan backend di `/files/...`.
 - Backend hanya menerima request dari origin di `CORS_ORIGINS` (default `http://localhost:5173`), jadi frontend harus jalan di port 5173.
 
 ## Alur Utama
 
-1. Warga login, lalu upload video. Backend membuat **job** inference.
-2. Inference menghasilkan **damage event** (tipe `D00`/`D10`/`D20`/`D40`, confidence, timestamp, bounding box, foto evidence).
-3. Warga mengisi lokasi lalu membuat **report** dari event.
-4. Admin memproses status report: `New → Verified → In Progress → Completed` (atau `Rejected`). Foto after-repair wajib sebelum `Completed`, dan setiap perubahan tercatat di riwayat.
+1. Pengendara login dan memulai **live scan** (kamera HP, atau video dashcam untuk simulasi).
+2. HP mengirim 1 frame per detik ke server. Server menjalankan model dan membalas kotak deteksi (`D00`/`D10`/`D20`/`D40`).
+3. Kalau ada **lubang**, HP berbunyi ("Awas, lubang di depan"), bergetar, dan layar berkedip merah. Retak hanya diberi kotak.
+4. Setiap kerusakan unik disimpan sebagai **damage event** (dengan lokasi GPS dan foto) dan bisa dilihat lagi di **History**.

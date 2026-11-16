@@ -18,20 +18,19 @@ export default function LoginPage() {
   const isRegister = mode === 'register'
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
-  const goHome = (u) => navigate(u.role === 'admin' ? '/admin' : location.state?.from || '/', { replace: true })
+  const goHome = () => navigate(location.state?.from || '/', { replace: true })
 
   // Sudah login (mis. buka /login manual) -> langsung ke halaman utama
-  if (user) return <Navigate to={user.role === 'admin' ? '/admin' : '/'} replace />
+  if (user) return <Navigate to="/" replace />
 
   const submit = async (e) => {
     e.preventDefault()
     setError(null)
     setBusy(true)
     try {
-      const u = isRegister
-        ? await signUp({ name: form.name.trim(), email: form.email.trim(), password: form.password })
-        : await signIn(form.email.trim(), form.password)
-      goHome(u)
+      if (isRegister) await signUp({ name: form.name.trim(), email: form.email.trim(), password: form.password })
+      else await signIn(form.email.trim(), form.password)
+      goHome()
     } catch (err) {
       setError(err.message)
       setBusy(false)
@@ -58,7 +57,7 @@ export default function LoginPage() {
 
         <Card
           eyebrow={isRegister ? 'Create account' : 'Welcome back'}
-          title={isRegister ? 'Register as a citizen' : 'Sign in to RoadSense'}
+          title={isRegister ? 'Register as a driver' : 'Sign in to RoadSense'}
           description={
             isRegister
               ? 'Upload road footage and send damage reports to the operations team.'

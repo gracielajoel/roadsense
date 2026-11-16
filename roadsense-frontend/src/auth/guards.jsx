@@ -9,10 +9,3 @@ export function RequireAuth() {
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />
   return <Outlet />
 }
-
-// Halaman khusus admin. User biasa dikembalikan ke halaman utama.
-export function RequireAdmin() {
-  const { isAdmin } = useAuth()
-  if (!isAdmin) return <Navigate to="/" replace />
-  return <Outlet />
-}

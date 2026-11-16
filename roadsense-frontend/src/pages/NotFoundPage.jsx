@@ -6,7 +6,7 @@ export default function NotFoundPage() {
     <div className="page">
       <Card eyebrow="404" title="Page not found">
         <p className="muted">
-          <Link to="/">Back to the citizen app</Link>
+          <Link to="/">Back to Live HUD</Link>
         </p>
       </Card>
     </div>

@@ -10,7 +10,7 @@ const sessions = new Map() // video_id -> { events: [], current }
 export async function startLiveSession() {
   await wait(200)
   const id = nextId++
-  sessions.set(id, { events: [], current: null })
+  sessions.set(id, { events: [], current: null, created_at: new Date().toISOString() })
   return { video_id: id, job_id: id }
 }
 
@@ -23,11 +23,12 @@ export async function sendLiveFrame(videoId, frame, { t, seq, lat, lng }) {
   }
   const c = s.current
   const k = c.step
-  const h = 0.07 + 0.03 * k
+  const h = 0.05 + 0.02 * k
   const det = {
     damage_type: c.type,
     confidence: +Math.min(0.97, 0.45 + Math.random() * 0.25 + 0.08 * k).toFixed(3),
-    bbox: [c.x - 0.02 * k, Math.min(0.55 + 0.08 * k, 1 - h), 0.12 + 0.05 * k, h],
+    // pita jalan pada footage dashcam (di atas: langit, di bawah: kap mobil)
+    bbox: [c.x - 0.02 * k, Math.min(0.58 + 0.05 * k, 0.8 - h), 0.1 + 0.04 * k, h],
   }
   const isNew = !c.event
   if (isNew) {
@@ -64,4 +65,19 @@ export async function endLiveSession(videoId) {
 export async function listLiveEvents(videoId) {
   await wait(100)
   return [...(sessions.get(videoId)?.events ?? [])]
+}
+
+export async function listLiveSessions() {
+  await wait(100)
+  return [...sessions.entries()].map(([id, s]) => ({
+    id,
+    filename: `Live scan ${s.created_at.slice(0, 16).replace('T', ' ')}`,
+    is_live: true,
+    created_at: s.created_at,
+  }))
+}
+
+export async function deleteLiveSession(videoId) {
+  await wait(100)
+  sessions.delete(videoId)
 }

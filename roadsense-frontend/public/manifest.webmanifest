@@ -2,7 +2,7 @@
   "name": "RoadSense",
   "short_name": "RoadSense",
   "description": "Live road damage scanning: your phone captures, the cloud detects.",
-  "start_url": "/live",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",

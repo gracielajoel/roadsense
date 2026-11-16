@@ -1,7 +1,6 @@
 import { USE_MOCK } from '../config'
 import * as mock from '../mocks/live'
 import client from './client'
-import { listVideoEvents } from './videos'
 
 // Live scan: HP kirim frame kamera, server yang menjalankan deteksi (lihat routers/live.py).
 // Satu sesi live = satu Video di backend (is_live = true).
@@ -22,4 +21,13 @@ export const sendLiveFrame = (videoId, frame, meta, signal) => {
 export const endLiveSession = (videoId) =>
   USE_MOCK ? mock.endLiveSession(videoId) : client.post(`/live/sessions/${videoId}/end`).then((r) => r.data)
 
-export const listLiveEvents = (videoId) => (USE_MOCK ? mock.listLiveEvents(videoId) : listVideoEvents(videoId))
+// Kerusakan yang tercatat di satu sesi (satu baris = satu kerusakan unik)
+export const listLiveEvents = (videoId) =>
+  USE_MOCK ? mock.listLiveEvents(videoId) : client.get(`/videos/${videoId}/events`).then((r) => r.data)
+
+// Riwayat perjalanan milik user yang login (hanya sesi live, bukan video upload lama)
+export const listLiveSessions = () =>
+  USE_MOCK ? mock.listLiveSessions() : client.get('/videos').then((r) => r.data.filter((v) => v.is_live))
+
+export const deleteLiveSession = (videoId) =>
+  USE_MOCK ? mock.deleteLiveSession(videoId) : client.delete(`/videos/${videoId}`)
