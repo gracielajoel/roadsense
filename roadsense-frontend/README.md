@@ -62,6 +62,7 @@ Setelah mengubah `.env`, restart `npm run dev`.
 ```
 public/
 ├── demo/dashcam-pov.mp4  # Video dashcam bawaan untuk mode simulasi
+├── demo/dashcam-pov.labels.json  # Lubang & retak asli di video itu (ditandai manual)
 └── manifest.webmanifest  # Supaya bisa di-install ke home screen HP
 src/
 ├── api/
@@ -118,9 +119,11 @@ Alur: HP di balik kaca depan → kamera belakang → tiap 1 detik (atau 2 detik)
 
 ### Simulasi dashcam POV
 
-Untuk demo/uji tanpa menyetir: di Live HUD pilih **Dashcam simulation**. Video POV diputar sebagai pengganti kamera HP dan frame-nya dikirim lewat jalur yang sama persis dengan scan sungguhan (1 frame/detik → server → kotak deteksi).
+Untuk demo/uji tanpa menyetir: di Live HUD pilih **Dashcam simulation**. Video POV diputar sebagai pengganti kamera HP dan frame-nya dikirim lewat jalur yang sama persis dengan scan sungguhan (2 frame/detik → server → kotak deteksi).
 
 - Video bawaan: `public/demo/dashcam-pov.mp4` (23 detik, rekaman dashcam POV jalan tol dari video uji tim `test_1_pothole.mp4`, judul di awal dipotong). Tombol **Choose video** memuat rekaman POV sendiri dari file.
+- Lubang & retak asli di video bawaan ditandai manual di `public/demo/dashcam-pov.labels.json` (detik + kotak). Kalau backend memakai dummy inference, label ini dikirim bersama frame (`sim_labels`) dan dipakai sebagai hasil deteksi, jadi peringatan muncul tepat saat lubang di video terlihat (±0,5 detik sebelum lewat di bawah mobil), bukan acak. Dengan model asli, label diabaikan. Video pilihan sendiri tidak punya label, jadi dummy kembali acak.
+- Kenapa default 2 frame/detik: di jalan tol lubang di video ini hanya terlihat ±0,7 detik sebelum lewat di bawah mobil. Dengan 1 frame/detik lubang bisa tertangkap terlambat atau terlewat.
 - GPS disimulasikan: mulai dari Surabaya, bergerak lurus 40 km/jam, jadi setiap deteksi tetap punya lokasi di History. HUD menandai mode ini dengan `SIM` dan `SIM GPS`.
 - Sesi otomatis selesai saat video habis.
 - Tidak perlu HTTPS (tidak memakai kamera), jadi bisa dicoba langsung di `http://localhost:5173`.

@@ -2,7 +2,7 @@
 
 Aplikasi peringatan lubang untuk pengendara. HP ditaruh di balik kaca depan dan mengirim frame kamera ke server, model computer vision mendeteksi kerusakan jalan (retak & lubang), lalu HP memberi peringatan suara kalau ada lubang di depan. Fokus hanya untuk pengendara: tidak ada pelaporan ke pemerintah dan tidak ada dashboard admin.
 
-**Video demo (58 detik, ada suara):** [`docs/demo/roadsense-driver-demo.mp4`](docs/demo/roadsense-driver-demo.mp4), simulasi dashcam POV, peringatan lubang, ringkasan perjalanan, dan History (inference dummy).
+**Video demo (59 detik, ada suara):** [`docs/demo/roadsense-driver-demo.mp4`](docs/demo/roadsense-driver-demo.mp4), simulasi dashcam POV, peringatan lubang, ringkasan perjalanan, dan History (inference dummy).
 
 ## Stack
 
@@ -128,6 +128,6 @@ Data tersimpan di volume Docker, jadi tidak hilang selama volume tidak dihapus. 
 ## Alur Utama
 
 1. Pengendara login dan memulai **live scan** (kamera HP, atau video dashcam untuk simulasi).
-2. HP mengirim 1 frame per detik ke server. Server menjalankan model dan membalas kotak deteksi (`D00`/`D10`/`D20`/`D40`).
+2. HP mengirim 2 frame per detik ke server (bisa diturunkan ke 1 atau 0,5 untuk hemat kuota). Server menjalankan model dan membalas kotak deteksi (`D00`/`D10`/`D20`/`D40`).
 3. Kalau ada **lubang**, HP berbunyi ("Awas, lubang di depan"), bergetar, dan layar berkedip merah. Retak hanya diberi kotak.
 4. Setiap kerusakan unik disimpan sebagai **damage event** (dengan lokasi GPS dan foto) dan bisa dilihat lagi di **History**.
