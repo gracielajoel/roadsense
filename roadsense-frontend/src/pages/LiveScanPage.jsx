@@ -3,6 +3,7 @@ import {
   BatteryCharging,
   CircleCheck,
   CloudUpload,
+  Film,
   Gauge,
   LoaderCircle,
   MapPin,
@@ -16,7 +17,10 @@ import {
   Smartphone,
   Square,
   TriangleAlert,
+  Upload,
   Video,
+  Volume2,
+  VolumeX,
   WifiOff,
   X,
 } from 'lucide-react'
@@ -29,6 +33,7 @@ import BoundingBox from '../components/inspection/BoundingBox'
 import FrameThumb from '../components/inspection/FrameThumb'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
+import { createAlerter } from '../utils/alerts'
 import { severityOf } from '../utils/constants'
 import { distanceM } from '../utils/geo'
 import { damageLabel, formatPercent, formatTime } from '../utils/format'
@@ -43,6 +48,14 @@ const INTERVALS = [
 ]
 const BOX_TTL_MS = 1600 // berapa lama kotak deteksi tetap tampil
 const MAX_GPS_ACCURACY_M = 30 // titik GPS yang lebih kasar tidak dihitung ke jarak tempuh
+const WARNING_MS = 2200 // lama banner peringatan lubang tampil
+
+// Mode simulasi: video dashcam POV diputar sebagai pengganti kamera HP (untuk demo & uji
+// tanpa menyetir). Frame tetap dikirim ke server lewat jalur yang sama persis.
+const DEMO_DASHCAM = { url: '/demo/dashcam-pov.mp4', name: 'Demo dashcam POV (36 s)' }
+const SIM_START = { lat: -7.2797, lng: 112.7974 } // titik awal GPS simulasi (Surabaya)
+const SIM_SPEED = 11 // m/s ≈ 40 km/jam
+const SIM_HEADING = (35 * Math.PI) / 180
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
 // "Pothole" -> "POTHOLE", "Alligator crack" -> "ALLIGATOR_CRACK" (gaya label HUD di desain)
@@ -78,6 +91,10 @@ export default function LiveScanPage() {
   const [dimmed, setDimmed] = useState(false)
   const [paused, setPaused] = useState(false)
   const [aspect, setAspect] = useState(16 / 9)
+  const [source, setSource] = useState('camera') // camera | sim
+  const [simVideo, setSimVideo] = useState(DEMO_DASHCAM) // { url, name }
+  const [soundOn, setSoundOn] = useState(true)
+  const [warning, setWarning] = useState(null) // { at } saat lubang terdeteksi
 
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -90,6 +107,9 @@ export default function LiveScanPage() {
   const wakeLockRef = useRef(null)
   const abortRef = useRef(null)
   const sessionRef = useRef(null)
+  const alerterRef = useRef(null)
+  const simTimerRef = useRef(null)
+  const simFileRef = useRef(null)
 
   // ---------- Perangkat: kamera, GPS, layar tetap menyala ----------
 
@@ -102,6 +122,9 @@ export default function LiveScanPage() {
     gpsRef.current = null
     wakeLockRef.current?.release().catch(() => {})
     wakeLockRef.current = null
+    clearInterval(simTimerRef.current)
+    simTimerRef.current = null
+    videoRef.current?.pause()
   }
 
   const requestWakeLock = async () => {
@@ -118,6 +141,7 @@ export default function LiveScanPage() {
       const wasRunning = runningRef.current
       stopDevices()
       if (wasRunning && sessionRef.current) endLiveSession(sessionRef.current.video_id).catch(() => {})
+      alerterRef.current?.close()
     },
     [],
   )
@@ -142,6 +166,18 @@ export default function LiveScanPage() {
     const id = setTimeout(() => setBoxes({ list: [], at: 0 }), BOX_TTL_MS)
     return () => clearTimeout(id)
   }, [boxes])
+
+  // Lepas object URL video simulasi pilihan user saat diganti / halaman ditutup
+  useEffect(() => {
+    const url = simVideo.url
+    return () => url.startsWith('blob:') && URL.revokeObjectURL(url)
+  }, [simVideo.url])
+
+  useEffect(() => {
+    if (!warning) return
+    const id = setTimeout(() => setWarning(null), WARNING_MS)
+    return () => clearTimeout(id)
+  }, [warning])
 
   useEffect(() => {
     if (!toast) return
@@ -169,26 +205,48 @@ export default function LiveScanPage() {
     }
   }
 
+  // GPS simulasi: maju lurus dengan kecepatan tetap, berhenti saat di-pause
+  const startSimGps = () => {
+    let { lat, lng } = SIM_START
+    const step = () => {
+      if (!pausedRef.current) {
+        lat += (SIM_SPEED * Math.cos(SIM_HEADING)) / 111320
+        lng += (SIM_SPEED * Math.sin(SIM_HEADING)) / (111320 * Math.cos((lat * Math.PI) / 180))
+      }
+      onPosition({ coords: { latitude: lat, longitude: lng, accuracy: 5, speed: pausedRef.current ? 0 : SIM_SPEED } })
+    }
+    step()
+    simTimerRef.current = setInterval(step, 1000)
+  }
+
   const start = async () => {
     setError(null)
     setPhase('starting')
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error()
-      streamRef.current = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        // Kamera belakang, resolusi & fps rendah: lebih hemat baterai, frame tetap cukup untuk model
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 10, max: 15 } },
-      })
-    } catch (err) {
-      stopDevices()
-      setError(cameraError(err))
-      setPhase('setup')
-      return
+    // Audio harus "dibuka" dari klik user, kalau tidak HP membisukan peringatan suara
+    alerterRef.current = alerterRef.current || createAlerter()
+    alerterRef.current.unlock()
+    alerterRef.current.setEnabled(soundOn)
+    if (source === 'camera') {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error()
+        streamRef.current = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          // Kamera belakang, resolusi & fps rendah: lebih hemat baterai, frame tetap cukup untuk model
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 10, max: 15 } },
+        })
+      } catch (err) {
+        stopDevices()
+        setError(cameraError(err))
+        setPhase('setup')
+        return
+      }
     }
 
     lastPointRef.current = null
     setDistance(0)
-    if (navigator.geolocation) {
+    if (source === 'sim') {
+      startSimGps()
+    } else if (navigator.geolocation) {
       const watchId = navigator.geolocation.watchPosition(
         onPosition,
         (err) => setGps({ error: err.code === 1 ? 'Location denied' : 'No GPS fix' }),
@@ -223,9 +281,16 @@ export default function LiveScanPage() {
 
   // Pasang stream ke <video> setelah elemen running ter-render
   useEffect(() => {
-    if (phase !== 'running' || !videoRef.current || !streamRef.current) return
+    if (phase !== 'running' || !videoRef.current) return
     const v = videoRef.current
-    v.srcObject = streamRef.current
+    if (source === 'sim') {
+      v.srcObject = null
+      v.src = simVideo.url
+      v.onended = () => runningRef.current && finish() // video habis = perjalanan selesai
+    } else {
+      if (!streamRef.current) return
+      v.srcObject = streamRef.current
+    }
     v.onloadedmetadata = () => v.videoWidth && setAspect(v.videoWidth / v.videoHeight)
     v.play().catch(() => {})
     loop(sessionRef.current.video_id)
@@ -259,6 +324,9 @@ export default function LiveScanPage() {
           setStats((s) => ({ frames: s.frames + 1, events: res.events_total, latency, offline: false }))
           if (res.detections.length) {
             setBoxes({ list: res.detections, at: Date.now() })
+            if (res.detections.some((d) => severityOf(d.damage_type).level === 1) && alerterRef.current?.pothole()) {
+              setWarning({ at: Date.now() })
+            }
             const fresh = res.detections.find((d) => d.is_new)
             if (fresh) setToast({ type: fresh.damage_type, confidence: fresh.confidence, lat: g?.lat, lng: g?.lng, at: Date.now() })
           }
@@ -282,6 +350,22 @@ export default function LiveScanPage() {
   const togglePause = () => {
     pausedRef.current = !pausedRef.current
     setPaused(pausedRef.current)
+    if (source === 'sim') {
+      const v = videoRef.current
+      if (pausedRef.current) v?.pause()
+      else v?.play().catch(() => {})
+    }
+  }
+
+  const toggleSound = () => {
+    const next = !soundOn
+    setSoundOn(next)
+    alerterRef.current?.setEnabled(next)
+  }
+
+  const pickSimFile = (file) => {
+    if (!file) return
+    setSimVideo({ url: URL.createObjectURL(file), name: file.name })
   }
 
   const finish = async () => {
@@ -311,7 +395,7 @@ export default function LiveScanPage() {
     const speedKmh = gps?.speed != null ? Math.round(gps.speed * 3.6) : null
     const fps = 1000 / intervalMs
     return (
-      <div className={`live ${dimmed ? 'is-dimmed' : ''}`}>
+      <div className={`live ${dimmed ? 'is-dimmed' : ''} ${warning ? 'has-warning' : ''}`}>
         <canvas ref={canvasRef} hidden />
 
         <header className="hud-header">
@@ -323,7 +407,7 @@ export default function LiveScanPage() {
               ROADSENSE <em>// HUD</em>
             </strong>
             <span>
-              <i className={`live-dot ${paused ? 'is-paused' : ''}`} /> {paused ? 'PAUSED' : 'LIVE SCAN'} · {formatTime(elapsed)}
+              <i className={`live-dot ${paused ? 'is-paused' : ''}`} /> {paused ? 'PAUSED' : source === 'sim' ? 'DASHCAM SIMULATION' : 'LIVE SCAN'} · {formatTime(elapsed)}
             </span>
           </div>
         </header>
@@ -334,6 +418,7 @@ export default function LiveScanPage() {
               <i className={`live-dot ${stats.offline ? 'is-error' : ''}`} />
               {stats.offline ? 'CLOUD LINK LOST // RETRYING' : 'AI ACTIVE // CLOUD'}
             </span>
+            {source === 'sim' && <span className="hud-tag hud-tag-warn">SIM</span>}
             <span className="hud-tag">{fps.toFixed(1)} FPS</span>
             <span className="muted">
               {stats.offline ? <WifiOff size={13} /> : stats.latency != null ? `${stats.latency}ms` : <CloudUpload size={13} />}
@@ -342,7 +427,7 @@ export default function LiveScanPage() {
           <div className="hud-grid">
             <div className="hud-chip">
               <div className="hud-chip-row">
-                <span>{gps?.error ? <MapPinOff size={13} /> : <MapPin size={13} />} GPS</span>
+                <span>{gps?.error ? <MapPinOff size={13} /> : <MapPin size={13} />} {source === 'sim' ? 'SIM GPS' : 'GPS'}</span>
                 <span className={gps?.error ? 'tone-warning' : 'hud-accent'}>
                   {gps?.error || (gps?.accuracy != null ? `±${Math.round(gps.accuracy)}m ACC` : 'SEARCHING')}
                 </span>
@@ -367,6 +452,11 @@ export default function LiveScanPage() {
             {boxes.list.map((d, i) => (
               <BoundingBox key={`${boxes.at}-${i}`} bbox={d.bbox} type={d.damage_type} label={`${hudLabel(d.damage_type)} · ${formatPercent(d.confidence)}`} />
             ))}
+            {warning && (
+              <div className="hud-warning" role="alert" key={warning.at}>
+                <TriangleAlert size={22} /> POTHOLE AHEAD · AWAS LUBANG
+              </div>
+            )}
             {paused && (
               <div className="live-paused">
                 <Pause size={18} /> Scanning paused
@@ -412,6 +502,10 @@ export default function LiveScanPage() {
             <button type="button" className="hud-btn" onClick={togglePause} disabled={phase === 'ending'}>
               {paused ? <Play size={18} className="hud-accent" /> : <Pause size={18} className="hud-accent" />}
               {paused ? 'RESUME' : 'PAUSE'}
+            </button>
+            <button type="button" className="hud-btn" onClick={toggleSound} aria-pressed={soundOn}>
+              {soundOn ? <Volume2 size={18} className="hud-accent" /> : <VolumeX size={18} className="tone-danger" />}
+              {soundOn ? 'SOUND' : 'MUTED'}
             </button>
             <button type="button" className="hud-btn" onClick={() => setDimmed(true)}>
               <Moon size={18} className="tone-warning" />
@@ -476,6 +570,32 @@ export default function LiveScanPage() {
       </ol>
 
       <div className="card live-start">
+        <p className="eyebrow">Video source</p>
+        <div className="live-interval" role="radiogroup">
+          <button type="button" role="radio" aria-checked={source === 'camera'} className={source === 'camera' ? 'is-active' : ''} onClick={() => setSource('camera')}>
+            <strong>
+              <Video size={14} /> Phone camera
+            </strong>
+            <span>Real drive, real GPS</span>
+          </button>
+          <button type="button" role="radio" aria-checked={source === 'sim'} className={source === 'sim' ? 'is-active' : ''} onClick={() => setSource('sim')}>
+            <strong>
+              <Film size={14} /> Dashcam simulation
+            </strong>
+            <span>Play a POV video as the camera</span>
+          </button>
+        </div>
+        {source === 'sim' && (
+          <div className="sim-picker">
+            <span className="small">
+              <Film size={14} /> {simVideo.name}
+            </span>
+            <input ref={simFileRef} type="file" accept="video/*" hidden onChange={(e) => pickSimFile(e.target.files[0])} />
+            <Button variant="secondary" icon={Upload} onClick={() => simFileRef.current?.click()}>
+              Choose video
+            </Button>
+          </div>
+        )}
         <p className="eyebrow">Frames sent to the cloud</p>
         <div className="live-interval" role="radiogroup">
           {INTERVALS.map((o) => (
@@ -498,7 +618,7 @@ export default function LiveScanPage() {
           </p>
         )}
         <Button icon={phase === 'starting' ? LoaderCircle : Video} onClick={start} disabled={phase === 'starting'} className="live-start-btn">
-          {phase === 'starting' ? 'Starting camera…' : 'Start live scan'}
+          {phase === 'starting' ? 'Starting…' : source === 'sim' ? 'Start simulation' : 'Start live scan'}
         </Button>
         <p className="muted small">Don't operate the phone while driving.</p>
       </div>

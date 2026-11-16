@@ -19,7 +19,7 @@ export async function sendLiveFrame(videoId, frame, { t, seq, lat, lng }) {
   const s = sessions.get(videoId)
   if (!s.current) {
     if (Math.random() > 0.15) return { detections: [], events_total: s.events.length, inference_ms: 30 }
-    s.current = { type: TYPES[Math.floor(Math.random() * 4)], x: 0.3 + Math.random() * 0.25, left: 2 + Math.floor(Math.random() * 3), step: 0, event: null }
+    s.current = { type: Math.random() < 0.4 ? 'D40' : TYPES[Math.floor(Math.random() * 3)], x: 0.3 + Math.random() * 0.25, left: 2 + Math.floor(Math.random() * 3), step: 0, event: null }
   }
   const c = s.current
   const k = c.step

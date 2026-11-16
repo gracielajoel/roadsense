@@ -130,6 +130,25 @@ Alur: HP di balik kaca depan → kamera belakang → tiap 1 detik (atau 2 detik)
 - Portrait: layout seperti Figma 04. Landscape (HP di dudukan dashboard): kamera penuh layar, HUD melayang di atasnya.
 - Bisa di-"install" ke home screen (`public/manifest.webmanifest`), terbuka langsung di `/live` tanpa address bar.
 
+### Simulasi dashcam POV
+
+Untuk demo/uji tanpa menyetir: di halaman `/live` pilih **Dashcam simulation**. Video POV diputar sebagai pengganti kamera HP dan frame-nya dikirim lewat jalur yang sama persis dengan scan sungguhan (1 frame/detik → server → kotak deteksi).
+
+- Video bawaan: `public/demo/dashcam-pov.mp4` (36 detik, dari Pexels #11899866, lisensi bebas pakai). Tombol **Choose video** memuat rekaman POV sendiri dari file.
+- GPS disimulasikan: mulai dari Surabaya, bergerak lurus 40 km/jam, jadi setiap deteksi tetap punya lokasi dan bisa langsung dilaporkan. HUD menandai mode ini dengan `SIM` dan `SIM GPS`.
+- Sesi otomatis selesai saat video habis.
+- Tidak perlu HTTPS (tidak memakai kamera), jadi bisa dicoba langsung di `http://localhost:5173/live`.
+
+### Peringatan lubang
+
+Kalau server mendeteksi lubang (SEV-1, `D40`), HP:
+
+- membunyikan 3 bip (Web Audio API, tanpa file suara) lalu suara **"Awas, lubang di depan"** (`speechSynthesis`, suara Indonesia kalau tersedia di HP),
+- bergetar (Android),
+- menampilkan banner merah berkedip dan tepi layar merah.
+
+Retak hanya diberi kotak, tanpa suara, supaya tidak mengganggu. Ada jeda 2,5 detik antar peringatan, dan tombol **SOUND/MUTED** di HUD. Kode: `src/utils/alerts.js`. Halaman lain bisa mendengarkan event `roadsense:alert` di `window`.
+
 ### Mencoba di HP
 
 Kamera di browser HP **wajib HTTPS**. Cara paling gampang: tunnel HTTPS ke dev server.

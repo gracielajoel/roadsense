@@ -78,7 +78,8 @@ def _detect_dummy(_jpeg: bytes) -> list[FrameDetection]:
             if random.random() > 0.15:
                 return []
             s = _dummy_state = {
-                "type": random.choice(["D00", "D10", "D20", "D40"]),
+                # lubang lebih sering muncul supaya peringatan suara ikut teruji di demo
+                "type": random.choices(["D00", "D10", "D20", "D40"], weights=[2, 2, 2, 4])[0],
                 "x": random.uniform(0.3, 0.55),
                 "frames_left": random.randint(2, 4),
                 "step": 0,
