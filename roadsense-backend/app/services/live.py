@@ -85,11 +85,14 @@ def _detect_dummy(_jpeg: bytes) -> list[FrameDetection]:
                 "step": 0,
             }
         k = s["step"]
-        w, h = 0.12 + 0.05 * k, 0.07 + 0.03 * k
+        w, h = 0.10 + 0.04 * k, 0.05 + 0.02 * k
+        # Tetap di pita jalan pada footage dashcam (±58-80% tinggi frame): di atasnya cakrawala/langit,
+        # di bawahnya kap mobil. Kotak turun & membesar seperti lubang yang makin dekat.
+        y = min(0.58 + 0.05 * k, 0.80 - h)
         det = FrameDetection(
             damage_type=s["type"],
             confidence=round(min(0.97, random.uniform(0.45, 0.7) + 0.08 * k), 4),
-            bbox=[round(s["x"] - 0.02 * k, 4), round(min(0.55 + 0.08 * k, 1 - h), 4), round(w, 4), round(h, 4)],
+            bbox=[round(s["x"] - 0.02 * k, 4), round(y, 4), round(w, 4), round(h, 4)],
         )
         s["step"] += 1
         s["frames_left"] -= 1
