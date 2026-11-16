@@ -2,6 +2,8 @@
 
 Aplikasi peringatan lubang untuk pengendara. HP ditaruh di balik kaca depan dan mengirim frame kamera ke server, model computer vision mendeteksi kerusakan jalan (retak & lubang), lalu HP memberi peringatan suara kalau ada lubang di depan. Fokus hanya untuk pengendara: tidak ada pelaporan ke pemerintah dan tidak ada dashboard admin.
 
+**Video demo (58 detik, ada suara):** [`docs/demo/roadsense-driver-demo.mp4`](docs/demo/roadsense-driver-demo.mp4), simulasi dashcam POV, peringatan lubang, ringkasan perjalanan, dan History (inference dummy).
+
 ## Stack
 
 | Bagian   | Teknologi            | Folder                                       |
