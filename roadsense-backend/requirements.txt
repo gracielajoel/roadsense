@@ -4,5 +4,6 @@ sqlalchemy>=2.0
 psycopg2-binary
 python-multipart
 alembic
-# nanti dari tim CV: ultralytics, opencv-python
 python-dotenv
+ultralytics==8.4.189   # versi sama dengan saat training; ikut memasang torch & opencv
+pyjwt

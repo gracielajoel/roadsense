@@ -3,14 +3,12 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..db import get_db
+from ..deps import ensure_video_access, get_current_user, require_admin
+from ..serializers import event_out
 
 router = APIRouter(prefix="/events", tags=["events"])
 
-
-def _out(e: models.DamageEvent) -> schemas.EventOut:
-    item = schemas.EventOut.model_validate(e)
-    item.evidence_url = f"/files/{e.evidence_path}" if e.evidence_path else None
-    return item
+USER_EDITABLE = {"latitude", "longitude"}  # user biasa hanya boleh mengisi lokasi
 
 
 def _get_or_404(db: Session, event_id: int) -> models.DamageEvent:
@@ -21,44 +19,79 @@ def _get_or_404(db: Session, event_id: int) -> models.DamageEvent:
 
 
 @router.post("", response_model=schemas.EventOut, status_code=201)
-def create_event(data: schemas.EventCreate, db: Session = Depends(get_db)):
-    """Event normalnya dibuat otomatis oleh inference. Endpoint ini untuk testing/manual."""
+def create_event(
+    data: schemas.EventCreate,
+    _admin: models.User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Event normalnya dibuat otomatis oleh inference. Endpoint ini untuk admin (testing/manual)."""
     if not db.get(models.Video, data.video_id):
         raise HTTPException(404, "Video tidak ditemukan")
     e = models.DamageEvent(**data.model_dump())
     db.add(e)
     db.commit()
     db.refresh(e)
-    return _out(e)
+    return event_out(e)
 
 
 @router.get("", response_model=list[schemas.EventOut])
-def list_events(video_id: int | None = None, db: Session = Depends(get_db)):
+def list_events(
+    video_id: int | None = None,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """User: event dari video miliknya. Admin: semua event."""
     q = db.query(models.DamageEvent)
+    if user.role != "admin":
+        q = q.join(models.Video, models.Video.id == models.DamageEvent.video_id).filter(
+            models.Video.user_id == user.id
+        )
     if video_id is not None:
-        q = q.filter_by(video_id=video_id)
-    return [_out(e) for e in q.order_by(models.DamageEvent.id).all()]
+        q = q.filter(models.DamageEvent.video_id == video_id)
+    return [event_out(e) for e in q.order_by(models.DamageEvent.id).all()]
 
 
 @router.get("/{event_id}", response_model=schemas.EventOut)
-def get_event(event_id: int, db: Session = Depends(get_db)):
-    return _out(_get_or_404(db, event_id))
+def get_event(
+    event_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    e = _get_or_404(db, event_id)
+    ensure_video_access(user, e.video)
+    return event_out(e)
 
 
 @router.patch("/{event_id}", response_model=schemas.EventOut)
-def update_event(event_id: int, data: schemas.EventUpdate, db: Session = Depends(get_db)):
-    """Dipakai user untuk mengisi lokasi (latitude/longitude), atau admin untuk koreksi tipe."""
+def update_event(
+    event_id: int,
+    data: schemas.EventUpdate,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """User pemilik: isi lokasi (latitude/longitude). Admin: lokasi + koreksi tipe/confidence."""
     e = _get_or_404(db, event_id)
-    for k, v in data.model_dump(exclude_unset=True).items():
+    ensure_video_access(user, e.video)
+    changes = data.model_dump(exclude_unset=True)
+
+    if user.role != "admin":
+        if set(changes) - USER_EDITABLE:
+            raise HTTPException(403, "User hanya boleh mengubah latitude dan longitude")
+        report = db.query(models.Report).filter_by(event_id=event_id).first()
+        if report and report.status != "New":
+            raise HTTPException(409, "Report sudah diproses admin, lokasi tidak bisa diubah user")
+
+    for k, v in changes.items():
         setattr(e, k, v)
     db.commit()
     db.refresh(e)
-    return _out(e)
+    return event_out(e)
 
 
 @router.delete("/{event_id}", status_code=204)
-def delete_event(event_id: int, db: Session = Depends(get_db)):
+def delete_event(
+    event_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     e = _get_or_404(db, event_id)
+    ensure_video_access(user, e.video)
     if db.query(models.Report).filter_by(event_id=event_id).first():
         raise HTTPException(409, "Event sudah punya report, hapus report-nya dulu")
     db.delete(e)

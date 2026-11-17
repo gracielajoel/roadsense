@@ -24,3 +24,7 @@ build/
 Thumbs.db
 .vscode/
 .idea/
+
+# Storage & local database (local runtime data)
+roadsense-backend/storage/
+*.db

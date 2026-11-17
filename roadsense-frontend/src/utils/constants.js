@@ -7,8 +7,12 @@ export const DAMAGE_TYPES = {
   D40: 'Pothole',
 }
 
-export const REPORT_STATUSES = ['New', 'Verified', 'In Progress', 'Completed', 'Rejected']
-
-export const JOB_STATUSES = ['queued', 'processing', 'done', 'failed']
-
-export const ROLES = ['user', 'admin']
+// Tingkat keparahan per jenis kerusakan (taksonomi di Figma "01 Cover & Architecture"):
+// lubang = SEV-1 critical (merah), retak = SEV-2 moderate (kuning).
+export const SEVERITY = {
+  D40: { level: 1, label: 'SEV-1 Critical', tone: 'danger' },
+  D20: { level: 2, label: 'SEV-2 Moderate', tone: 'warning' },
+  D10: { level: 2, label: 'SEV-2 Moderate', tone: 'warning' },
+  D00: { level: 2, label: 'SEV-2 Moderate', tone: 'warning' },
+}
+export const severityOf = (type) => SEVERITY[type] || { level: 2, label: 'SEV-2 Moderate', tone: 'warning' }

@@ -1,36 +1,26 @@
 import { createBrowserRouter } from 'react-router-dom'
-import AdminLayout from './layouts/AdminLayout'
+import { RequireAuth } from './auth/guards'
 import MainLayout from './layouts/MainLayout'
-import EventsPage from './pages/admin/EventsPage'
-import OverviewPage from './pages/admin/OverviewPage'
-import ReportDetailPage from './pages/admin/ReportDetailPage'
-import ReportsPage from './pages/admin/ReportsPage'
-import UsersPage from './pages/admin/UsersPage'
-import VideoDetailPage from './pages/admin/VideoDetailPage'
-import VideosPage from './pages/admin/VideosPage'
-import CitizenPage from './pages/CitizenPage'
+import HistoryPage from './pages/HistoryPage'
+import LiveScanPage from './pages/LiveScanPage'
+import LoginPage from './pages/LoginPage'
 import NotFoundPage from './pages/NotFoundPage'
 
+// Aplikasi khusus pengendara: Live HUD (peringatan lubang) + riwayat perjalanan sendiri.
 const router = createBrowserRouter([
+  { path: '/login', element: <LoginPage /> },
   {
     path: '/',
-    element: <MainLayout />,
+    element: <RequireAuth />,
     children: [
-      { index: true, element: <CitizenPage /> },
       {
-        path: 'admin',
-        element: <AdminLayout />,
+        element: <MainLayout />,
         children: [
-          { index: true, element: <OverviewPage /> },
-          { path: 'reports', element: <ReportsPage /> },
-          { path: 'reports/:id', element: <ReportDetailPage /> },
-          { path: 'events', element: <EventsPage /> },
-          { path: 'videos', element: <VideosPage /> },
-          { path: 'videos/:id', element: <VideoDetailPage /> },
-          { path: 'users', element: <UsersPage /> },
+          { index: true, element: <LiveScanPage /> },
+          { path: 'history', element: <HistoryPage /> },
+          { path: '*', element: <NotFoundPage /> },
         ],
       },
-      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ])

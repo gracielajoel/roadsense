@@ -1,0 +1,872 @@
+/* =====================================================================
+   Tactical Telemetry & GIS (Figma "MANPRO DETEKSI JALAN")
+   Dimuat setelah index.css: menimpa gaya dasar + komponen layar baru
+   (live HUD, bottom nav, history).
+   ===================================================================== */
+
+a.btn {
+  text-decoration: none;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+.hud-accent {
+  color: var(--accent);
+}
+
+.brand-mark {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+  border-radius: 8px;
+}
+
+.brand strong {
+  font-family: var(--mono);
+  letter-spacing: 0.08em;
+}
+
+.avatar {
+  background: rgba(0, 245, 155, 0.16);
+  border-color: rgba(0, 245, 155, 0.4);
+  color: var(--accent);
+}
+
+.segmented a.active {
+  color: var(--accent);
+}
+
+.card {
+  box-shadow: none;
+}
+
+.stat-value {
+  font-family: var(--mono);
+  font-weight: 600;
+}
+
+/* Status pill dengan titik (Figma 03 · Lifecycle status pills) */
+.badge {
+  gap: 6px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+.badge-success {
+  background: rgba(0, 245, 155, 0.1);
+  border-color: rgba(0, 245, 155, 0.25);
+}
+
+.badge-warning {
+  background: rgba(254, 183, 0, 0.12);
+  border-color: rgba(254, 183, 0, 0.3);
+}
+
+.badge-danger {
+  color: #ff8a80;
+  background: rgba(147, 0, 10, 0.45);
+  border-color: rgba(255, 59, 48, 0.35);
+}
+
+.tone-bg-danger {
+  background: var(--danger-deep);
+  color: #fff;
+}
+
+.tone-bg-warning {
+  background: var(--warning);
+  color: #231a00;
+}
+
+.tone-bg-success {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* Bounding box per tingkat keparahan */
+.bbox-danger {
+  border-color: var(--danger);
+  background: rgba(255, 59, 48, 0.08);
+}
+
+.bbox-danger .bbox-label {
+  background: var(--danger-deep);
+}
+
+.bbox-warning {
+  border-color: var(--warning);
+  background: rgba(254, 183, 0, 0.06);
+}
+
+.bbox-warning .bbox-label {
+  background: var(--warning);
+  color: #231a00;
+}
+
+.bbox-label {
+  font-family: var(--mono);
+}
+
+.live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse 1.6s ease-in-out infinite;
+  flex: none;
+}
+
+.live-dot.is-paused {
+  background: var(--warning);
+  box-shadow: 0 0 8px var(--warning);
+  animation: none;
+}
+
+.live-dot.is-error {
+  background: var(--danger);
+  box-shadow: 0 0 8px var(--danger);
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ---------- Mobile: bottom tab bar ---------- */
+
+.bottom-nav {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .app-header .segmented {
+    display: none;
+  }
+
+  .app-header {
+    grid-template-columns: 1fr auto;
+  }
+
+  .container {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+
+  .bottom-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    display: flex;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+    background: rgba(10, 14, 19, 0.95);
+    border-top: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+  }
+
+  .bottom-nav a {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 0;
+    color: var(--muted);
+    text-decoration: none;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .bottom-nav a.active {
+    color: var(--accent);
+  }
+
+  .hero .btn {
+    width: 100%;
+  }
+}
+
+/* ---------- Live scan: setup ---------- */
+
+.live-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.live-steps li {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+
+.live-steps strong {
+  font-size: 13px;
+}
+
+.live-start {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 520px;
+}
+
+.live-interval {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.live-interval button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--input);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.live-interval button strong {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.live-interval button span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.live-interval button.is-active {
+  border-color: var(--accent);
+  background: rgba(0, 245, 155, 0.06);
+}
+
+.live-start-btn {
+  padding: 14px 16px;
+  font-size: 14px;
+  font-family: var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 720px) {
+  .live-steps {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Live scan: HUD (Figma 04) ---------- */
+
+.live {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: calc(10px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  overflow: hidden;
+  font-family: var(--mono);
+}
+
+.hud-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hud-header div {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.hud-header strong {
+  font-size: 15px;
+  letter-spacing: 0.1em;
+}
+
+.hud-header em {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.hud-header span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.hud-brand-tile {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--accent);
+}
+
+.hud-top,
+.hud-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  z-index: 2;
+}
+
+.hud-chip {
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: rgba(24, 28, 33, 0.92);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+  font-size: 12px;
+  min-width: 0;
+}
+
+.hud-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hud-status > span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hud-tag {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 245, 155, 0.14);
+  color: var(--accent);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.hud-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.hud-chip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.hud-chip-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.hud-chip-value {
+  margin-top: 2px;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.live-stage-wrap {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  background: #000;
+  overflow: hidden;
+}
+
+.live-stage {
+  position: relative;
+  aspect-ratio: var(--ar);
+  width: min(100%, calc((100dvh - 330px) * var(--ar)));
+  max-height: 100%;
+}
+
+.live-stage video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+
+.live-stage .bbox {
+  border-width: 2px;
+}
+
+.live-stage .bbox-label {
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
+.live-paused {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--warning);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hud-toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: rgba(24, 28, 33, 0.96);
+  border: 1px solid var(--border-strong);
+  animation: toast-in 0.2s ease-out;
+}
+
+.hud-toast > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hud-toast strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+.hud-toast > div > span {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hud-toast button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.hud-toast-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  flex: none;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.hud-trip {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.hud-trip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud-trip strong {
+  color: var(--text);
+}
+
+.hud-trip strong.tone-warning {
+  color: var(--warning);
+}
+
+.hud-actions {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 8px;
+}
+
+.hud-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 60px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.hud-btn-primary {
+  flex-direction: row;
+  gap: 10px;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 0 20px rgba(0, 245, 155, 0.25);
+}
+
+.hud-btn:disabled {
+  opacity: 0.6;
+}
+
+.live-dim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
+  border: 0;
+  background: #000;
+  color: #3d4249;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+
+.live-dim span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* HP miring (landscape) di dudukan dashboard: kamera penuh, HUD melayang di atasnya */
+@media (orientation: landscape) and (max-height: 560px) {
+  .live {
+    padding: calc(8px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom))
+      calc(10px + env(safe-area-inset-left));
+    justify-content: space-between;
+  }
+
+  .hud-header {
+    display: none;
+  }
+
+  .live-stage-wrap {
+    position: absolute;
+    inset: 0;
+    border-radius: 0;
+  }
+
+  .live-stage {
+    width: min(100vw, calc(100dvh * var(--ar)));
+  }
+
+  .hud-top {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .hud-top .hud-status {
+    flex: 1;
+  }
+
+  .hud-top .hud-grid {
+    flex: 1.4;
+  }
+
+  .hud-bottom {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+  }
+
+  .hud-toast {
+    grid-column: 1 / -1;
+    max-width: 460px;
+  }
+
+  .hud-actions {
+    grid-template-columns: auto auto auto;
+  }
+
+  .hud-btn {
+    min-height: 48px;
+    padding: 0 16px;
+  }
+}
+
+/* ---------- Live scan: summary ---------- */
+
+.live-preview {
+  padding: 10px;
+}
+
+.live-preview .thumb {
+  width: 100%;
+  border-radius: 6px;
+}
+
+.live-result {
+  cursor: default;
+  padding-right: 10px;
+}
+
+.live-result-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.live-result .detection-info strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Grid statistik tidak boleh melebar keluar layar di HP */
+.stats > * {
+  min-width: 0;
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .hud-chip {
+    background: rgba(16, 20, 25, 0.72);
+  }
+}
+
+/* ---------- Dashcam simulation + peringatan lubang ---------- */
+
+.sim-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--input);
+  border: 1px dashed var(--border-strong);
+}
+
+.sim-picker > span,
+.live-interval button strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud-tag-warn {
+  background: rgba(254, 183, 0, 0.16);
+  color: var(--warning);
+}
+
+.hud-warning {
+  position: absolute;
+  left: 50%;
+  top: 10%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  background: var(--danger-deep);
+  border: 2px solid var(--danger);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  box-shadow: 0 0 28px rgba(255, 59, 48, 0.6);
+  animation: warn-flash 0.45s ease-in-out 4 alternate;
+}
+
+@keyframes warn-flash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.45;
+  }
+}
+
+/* Tepi layar ikut berkedip merah supaya terlihat dari sudut mata saat menyetir */
+.live.has-warning .live-stage-wrap {
+  box-shadow: inset 0 0 0 4px var(--danger), inset 0 0 60px rgba(255, 59, 48, 0.45);
+}
+
+.hud-actions {
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .hud-actions {
+    grid-template-columns: auto auto auto auto;
+  }
+}
+
+/* Landscape: chip HUD menutupi bagian atas video, jadi banner turun ke area jalan */
+@media (orientation: landscape) and (max-height: 560px) {
+  .hud-warning {
+    top: 34%;
+  }
+}
+
+/* ---------- History ---------- */
+
+.drive-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.drive {
+  padding: 0;
+  overflow: hidden;
+}
+
+.drive-head {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.drive-head:hover {
+  background: var(--raised);
+}
+
+.drive-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.drive-counts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  color: var(--muted);
+}
+
+.drive-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 0 16px 16px;
+}
+
+.drive-detections {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.drive-map {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  font-size: 12px;
+}
