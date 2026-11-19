@@ -38,17 +38,22 @@ import { damageLabel, formatPercent, formatTime } from '../utils/format'
 // HP cuma mengompres gambar; model jalan di server supaya HP tidak panas & hemat baterai.
 const FRAME_WIDTH = 640
 const JPEG_QUALITY = 0.7
+// Di jalan tol lubang hanya terlihat ±1 detik sebelum lewat di bawah mobil, jadi 2 frame/detik
+// adalah default: lubang tertangkap minimal sekali sebelum sampai ke mobil.
 const INTERVALS = [
-  { ms: 1000, label: '1 / sec', hint: 'Best coverage' },
+  { ms: 500, label: '2 / sec', hint: 'Earliest warning' },
+  { ms: 1000, label: '1 / sec', hint: 'Balanced' },
   { ms: 2000, label: '1 / 2 sec', hint: 'Saves data & battery' },
 ]
-const BOX_TTL_MS = 1600 // berapa lama kotak deteksi tetap tampil
+const BOX_TTL_MS = 1200 // cadangan kalau jaringan macet; normalnya kotak hilang saat frame berikutnya kosong
 const MAX_GPS_ACCURACY_M = 30 // titik GPS yang lebih kasar tidak dihitung ke jarak tempuh
 const WARNING_MS = 2200 // lama banner peringatan lubang tampil
 
 // Mode simulasi: video dashcam POV diputar sebagai pengganti kamera HP (untuk demo & uji
 // tanpa menyetir). Frame tetap dikirim ke server lewat jalur yang sama persis.
-const DEMO_DASHCAM = { url: '/demo/dashcam-pov.mp4', name: 'Demo dashcam POV (23 s)' }
+// labels: kerusakan asli di video demo (ditandai manual). Dengan dummy inference, server memakai
+// label ini, bukan kotak acak, supaya peringatan muncul tepat saat lubang di video terlihat.
+const DEMO_DASHCAM = { url: '/demo/dashcam-pov.mp4', name: 'Demo dashcam POV (23 s)', labels: '/demo/dashcam-pov.labels.json' }
 const SIM_START = { lat: -7.2797, lng: 112.7974 } // titik awal GPS simulasi (Surabaya)
 const SIM_SPEED = 11 // m/s ≈ 40 km/jam
 const SIM_HEADING = (35 * Math.PI) / 180
@@ -56,6 +61,27 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
 // "Pothole" -> "POTHOLE", "Alligator crack" -> "ALLIGATOR_CRACK" (gaya label HUD di desain)
 const hudLabel = (type) => damageLabel(type).toUpperCase().replace(/\s+/g, '_')
+
+// Label kerusakan di detik t video demo: interpolasi linear antar keyframe tiap track
+function labelsAt(tracks, t) {
+  const out = []
+  for (const tr of tracks) {
+    const k = tr.keys
+    if (t < k[0][0] || t > k[k.length - 1][0]) continue
+    let i = 0
+    while (i < k.length - 2 && t > k[i + 1][0]) i += 1
+    const [t0, ...a] = k[i]
+    const [t1, ...b] = k[Math.min(i + 1, k.length - 1)]
+    const f = t1 > t0 ? (t - t0) / (t1 - t0) : 0
+    const p = (t - k[0][0]) / Math.max(0.001, k[k.length - 1][0] - k[0][0])
+    out.push({
+      damage_type: tr.type,
+      confidence: +(tr.confidence[0] + (tr.confidence[1] - tr.confidence[0]) * p).toFixed(3),
+      bbox: a.map((v, j) => +(v + (b[j] - v) * f).toFixed(4)),
+    })
+  }
+  return out
+}
 
 function captureFrame(video, canvas) {
   const scale = Math.min(1, FRAME_WIDTH / video.videoWidth)
@@ -106,6 +132,7 @@ export default function LiveScanPage() {
   const alerterRef = useRef(null)
   const simTimerRef = useRef(null)
   const simFileRef = useRef(null)
+  const simLabelsRef = useRef(null) // track kerusakan asli video demo (null = video tanpa label)
 
   // ---------- Perangkat: kamera, GPS, layar tetap menyala ----------
 
@@ -240,7 +267,14 @@ export default function LiveScanPage() {
 
     lastPointRef.current = null
     setDistance(0)
+    simLabelsRef.current = null
     if (source === 'sim') {
+      if (simVideo.labels) {
+        simLabelsRef.current = await fetch(simVideo.labels)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((j) => j?.tracks || null)
+          .catch(() => null)
+      }
       startSimGps()
     } else if (navigator.geolocation) {
       const watchId = navigator.geolocation.watchPosition(
@@ -305,13 +339,21 @@ export default function LiveScanPage() {
       const v = videoRef.current
       if (!pausedRef.current && document.visibilityState === 'visible' && v?.readyState >= 2) {
         try {
+          const videoT = v.currentTime
           const blob = await captureFrame(v, canvasRef.current)
           const g = gpsRef.current
+          const tracks = source === 'sim' ? simLabelsRef.current : null
           abortRef.current = new AbortController()
           const res = await sendLiveFrame(
             videoId,
             blob,
-            { t: ((tick - startedAtRef.current) / 1000).toFixed(2), seq, lat: g?.lat, lng: g?.lng },
+            {
+              t: ((tick - startedAtRef.current) / 1000).toFixed(2),
+              seq,
+              lat: g?.lat,
+              lng: g?.lng,
+              sim_labels: tracks ? JSON.stringify(labelsAt(tracks, videoT)) : null,
+            },
             abortRef.current.signal,
           )
           if (!runningRef.current) break
@@ -319,7 +361,10 @@ export default function LiveScanPage() {
           failures = 0
           const latency = Date.now() - tick
           setStats((s) => ({ frames: s.frames + 1, events: res.events_total, latency, offline: false }))
-          if (res.detections.length) {
+          if (!res.detections.length) {
+            // frame terbaru bersih: hapus kotak lama supaya tidak tertinggal setelah lubang lewat
+            setBoxes((b) => (b.list.length ? { list: [], at: 0 } : b))
+          } else {
             setBoxes({ list: res.detections, at: Date.now() })
             if (res.detections.some((d) => severityOf(d.damage_type).level === 1) && alerterRef.current?.pothole()) {
               setWarning({ at: Date.now() })

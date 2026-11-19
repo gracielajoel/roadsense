@@ -14,9 +14,11 @@ export async function startLiveSession() {
   return { video_id: id, job_id: id }
 }
 
-export async function sendLiveFrame(videoId, frame, { t, seq, lat, lng }) {
+export async function sendLiveFrame(videoId, frame, { t, seq, lat, lng, sim_labels }) {
   await wait(120 + Math.random() * 120)
   const s = sessions.get(videoId)
+  // Simulasi dengan video demo berlabel: pakai kerusakan asli di video, bukan acak (sama seperti backend)
+  if (sim_labels != null) return labeledFrame(s, videoId, frame, { t, seq, lat, lng }, JSON.parse(sim_labels))
   if (!s.current) {
     if (Math.random() > 0.15) return { detections: [], events_total: s.events.length, inference_ms: 30 }
     s.current = { type: Math.random() < 0.4 ? 'D40' : TYPES[Math.floor(Math.random() * 3)], x: 0.3 + Math.random() * 0.25, left: 2 + Math.floor(Math.random() * 3), step: 0, event: null }
@@ -55,6 +57,35 @@ export async function sendLiveFrame(videoId, frame, { t, seq, lat, lng }) {
     events_total: s.events.length,
     inference_ms: 30,
   }
+}
+
+// Satu event per jenis kerusakan yang sedang terlihat; digabung selama terlihat di frame berturut-turut
+function labeledFrame(s, videoId, frame, { t, seq, lat, lng }, labels) {
+  const live = s.labeled || (s.labeled = {})
+  const detections = labels.map((det) => {
+    let ev = live[det.damage_type]
+    const isNew = !ev || t - ev.last > 4
+    if (isNew) {
+      const event = { id: nextId++, video_id: videoId, track_id: s.events.length + 1, damage_type: det.damage_type, confidence: -1 }
+      ev = live[det.damage_type] = { event }
+      s.events.push(event)
+    }
+    ev.last = +t
+    if (det.confidence > ev.event.confidence) {
+      if (ev.event.evidence_url) URL.revokeObjectURL(ev.event.evidence_url)
+      Object.assign(ev.event, {
+        confidence: det.confidence,
+        bbox: det.bbox,
+        frame: seq,
+        timestamp_sec: t,
+        latitude: lat ?? null,
+        longitude: lng ?? null,
+        evidence_url: URL.createObjectURL(frame),
+      })
+    }
+    return { ...det, event_id: ev.event.id, is_new: isNew }
+  })
+  return { detections, events_total: s.events.length, inference_ms: 30 }
 }
 
 export async function endLiveSession(videoId) {

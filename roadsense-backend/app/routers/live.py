@@ -98,6 +98,9 @@ def send_frame(
     seq: int = Form(0, ge=0, description="Nomor urut frame dari HP"),
     lat: float | None = Form(None, ge=-90, le=90),
     lng: float | None = Form(None, ge=-180, le=180),
+    sim_labels: str | None = Form(
+        None, max_length=4000, description="Mode simulasi: label kerusakan asli di frame ini (hanya dipakai dummy inference)"
+    ),
     user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -113,7 +116,7 @@ def send_frame(
 
     started = datetime.now()
     try:
-        detections = detect_frame(jpeg)
+        detections = detect_frame(jpeg, sim_labels)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from None
     inference_ms = int((datetime.now() - started).total_seconds() * 1000)
